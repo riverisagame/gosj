@@ -1676,3 +1676,202 @@ func FuzzReverse(f *testing.F) {
 ---
 
 > **下一章**：[第12章 反射](./ch12-reflection.md) —— reflect.Type、reflect.Value、动态调用、结构体标签。
+
+---
+
+### 🔬 11.16 底层原理：go test是怎么工作的？测试覆盖率是怎么统计的？
+
+#### go test 执行过程——从源码到测试结果
+
+```
+           go test ./...
+               │
+               ▼
+     ┌──────────────────────────┐
+     │ 1. 扫描 *_test.go 文件   │
+     │    calc.go → calc_test.go│
+     │    这俩一起编译          │
+     └──────────┬───────────────┘
+               │
+               ▼
+     ┌──────────────────────────┐
+     │ 2. 创建一个临时的main包   │
+     │    把所有的TestXxx函数    │
+     │    注册到这个main里      │
+     └──────────┬───────────────┘
+               │
+               ▼
+     ┌──────────────────────────┐
+     │ 3. 编译为测试二进制       │
+     │    /tmp/go-test-xxx.test │
+     │    里面有TestMain或自动   │
+     │    生成的测试main        │
+     └──────────┬───────────────┘
+               │
+               ▼
+     ┌──────────────────────────┐
+     │ 4. 运行测试二进制         │
+     │    一个个执行TestXxx     │
+     │    记录结果              │
+     └──────────┬───────────────┘
+               │
+               ▼
+     ┌──────────────────────────┐
+     │ 5. 输出结果              │
+     │    PASS / FAIL           │
+     │    把临时文件删掉        │
+     └──────────────────────────┘
+
+核心：go test 内部调用 go test -c 编译成二进制
+  然后执行这个二进制
+  所以测试本质上是一个独立程序！
+```
+
+#### 测试覆盖率插桩——怎么知道哪些代码被执行了
+
+```
+普通编译：
+  func Add(a, b int) int {
+      return a + b
+  }
+  // → 编译成 ADD RAX, RBX
+
+覆盖率编译（插桩后）：
+  func Add(a, b int) int {
+      coverCounters[0]++  ← 插入计数器
+      return a + b
+  }
+  // → MOV [计数器], 1; ADD RAX, RBX
+
+覆盖率工具在编译时：
+  1. 在每个代码块（基本块）前插入计数器
+  2. 计数器存在一个全局数组里
+  3. 测试执行时，走过的代码块计数器+1
+  4. 测试结束后，统计哪些计数器>0
+
+go test -coverprofile=cover.out 的背后：
+  1. 编译器插桩（插入计数器）
+  2. 运行测试
+  3. 每个代码块执行时计数器+1
+  4. 生成cover.out（每行代码的执行次数）
+
+=> 覆盖率 = 计数器>0的代码块 / 总代码块
+```
+
+#### t.Error 和 t.Fatal 的底层实现
+
+```go
+// testing.T 内部有个字段 failed bool
+
+type T struct {
+    mu     sync.Mutex  // 并发安全
+    failed bool       // 是否失败
+    skipped bool      // 是否跳过
+    ...
+}
+
+func (t *T) Error(args ...interface{}) {
+    t.mu.Lock()
+    t.failed = true     // 标记失败
+    t.mu.Unlock()
+    log.Println(args)   // 打印日志
+    // ⚠️ 不停止！继续执行
+}
+
+func (t *T) Fatal(args ...interface{}) {
+    t.mu.Lock()
+    t.failed = true
+    t.mu.Unlock()
+    log.Println(args)
+    runtime.Goexit()    // ← 退出当前goroutine！
+    // 这会导致当前测试函数停止
+    // 但不影响其他测试函数
+}
+
+区别就一句话：
+  Error 只是记个红牌（继续跑）
+  Fatal 记红牌+直接下场（停止当前测试）
+```
+
+#### Benchmark 的 b.N 自适应算法
+
+```go
+func BenchmarkXxx(b *testing.B) {
+    for i := 0; i < b.N; i++ {
+        DoSomething()
+    }
+}
+
+b.N 不是固定的！Go自动调整：
+
+开始时：b.N = 1
+1. 用b.N=1跑一次
+2. 看跑了多久
+3. 如果 < 1秒 → b.N *= 2 → 再跑
+4. 重复直到总时间 ≥ 1秒
+5. 用最终的b.N跑出稳定结果
+
+举例：DoSomething()一次需要0.5μs
+  第1次: b.N=1   → 0.5μs < 1s → b.N=2
+  第2次: b.N=2   → 1μs < 1s → b.N=4
+  第3次: b.N=4   → 2μs < 1s → b.N=8
+  ...
+  第21次: b.N=2^20=1,048,576 → 0.52s < 1s → b.N=2,097,152
+  第22次: b.N=2,097,152 → 1.05s ≥ 1s ✅
+  
+  输出：
+  BenchmarkXxx-8  2097152  512 ns/op
+      运行次数 ↑    每次耗时 ↑
+```
+
+#### testing/synctest 为什么能加速时间
+
+```go
+import "testing/synctest"
+
+synctest.Run(func() {
+    time.Sleep(1 * time.Hour)  // 不会真的等1小时！
+})
+
+原理：
+  synctest 替换了 time 包的底层实现
+  
+  正常：time.Sleep → 系统调用 → 内核挂起goroutine → 真的等
+  synctest：time.Sleep → 假的计时器 → 立刻返回
+  
+  time.Now() 也变成假的：
+    可以手动控制当前时间
+    
+  就像游戏的"加速模式"：
+    游戏里的1小时 = 现实中的1毫秒
+```
+
+#### 测试缓存——为什么第二次go test这么快
+
+```
+第一次：
+  go test ./...  → 编译+测试 → 3秒
+
+第二次（源码没变）：
+  go test ./...  → (cached) → 0.1秒
+
+缓存原理：
+  1. 计算源码和测试文件的哈希值
+  2. 把哈希值和测试结果一起存到 $GOCACHE
+  3. 下次运行：计算哈希 → 命中缓存 → 直接输出上次结果
+
+什么情况下会刷新缓存？
+  1. 改动了任何 .go 文件
+  2. 改动了 go.mod（依赖变了）
+  3. 加了 -count=1 强制跳过
+
+什么情况下缓存"骗"了你？
+  测试依赖了外部系统（时间、网络、文件）
+  → 外部变了但Go不知道
+  → 一直用缓存结果
+  → 解决：go test -count=1
+```
+
+---
+
+> **下一章**：[第12章 反射](./ch12-reflection.md) —— reflect.Type、reflect.Value、动态调用、结构体标签。

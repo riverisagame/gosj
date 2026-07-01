@@ -1410,3 +1410,87 @@ GC和你的程序同时运行
 ---
 
 **🎉 全系列终极大完结！** 回到[首页](./README.md)。
+
+---
+
+### 🔬 13.14 更多底层原理——Go运行时和系统交互
+
+#### runtime.Gosched() 做了什么
+
+```go
+runtime.Gosched()
+// 让出当前goroutine的CPU
+
+底层：
+  1. 当前goroutine从_Grunning→_Grunnable
+  2. 放到全局队列末尾
+  3. 调用schedule()找下一个
+```
+
+#### runtime.Goexit() vs os.Exit()
+
+```go
+// runtime.Goexit()：只退出当前goroutine，defer会执行
+func main() {
+    go func() {
+        defer fmt.Println("defer执行")
+        runtime.Goexit()
+    }()
+    time.Sleep(time.Second)  // defer执行，main继续
+}
+
+// os.Exit(1)：退出整个进程，defer不执行！
+func main() {
+    defer fmt.Println("不执行")
+    os.Exit(1)  // 直接结束
+}
+```
+
+#### GC辅助标记（Mark Assist）
+
+```
+程序分配太快→GC跟不上→OOM
+
+Mark Assist：程序要分配内存时，先帮GC扫一会儿
+
+像：你疯狂购物，收银员忙不过来
+    收银员让你先帮忙扫码再买
+```
+
+#### GOMEMLIMIT（Go 1.19+）
+
+```go
+// 设置内存硬限制
+export GOMEMLIMIT=1GiB
+debug.SetMemoryLimit(1 << 30)
+
+// 和GOGC配合：
+// GOGC控制GC频率，GOMEMLIMIT控制上限
+```
+
+#### GODEBUG调试大全
+
+```bash
+GODEBUG=gctrace=1          # 每次GC打印
+GODEBUG=gcpacertrace=1     # 辅助标记信息
+GODEBUG=inittrace=1        # init执行顺序
+GODEBUG=schedtrace=1000    # 调度信息每1000ms
+GODEBUG=allocfreetrace=1   # 每次分配释放
+GODEBUG=urlstrictcolons=0  # Go 1.26+旧URL行为
+```
+
+#### race detector工作原理
+
+```
+go run -race main.go
+
+编译器：每个内存访问前插入检测代码
+运行时：维护影子内存，记录谁读谁写
+检测到冲突：有人写时你来读→竞争警告
+
+代价：慢5~10倍（所以只开发时用）
+```
+
+---
+
+**🎉 全系列终极大完结！** 回到[首页](./README.md)。

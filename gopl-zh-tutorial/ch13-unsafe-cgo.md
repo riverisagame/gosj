@@ -113,6 +113,25 @@ type B struct {
 
 ---
 
+### 大白话unsafe.Pointer
+
+unsafe.Pointer=万能指针。可以在不同类型的指针之间转换。
+
+就像万能充电器：
+- 普通充电器：只能充苹果
+- 万能充电器：苹果、华为、小米都能充
+
+unsafe.Pointer = 指针界的万能充电器。
+
+### 大白话Pointer
+
+unsafe.Pointer=万能充电器。不同指针类型随便转。
+
+普通：只能int*转int*
+unsafe.Pointer：int*转float*转string*...爱转啥转啥。
+
+危险！用错可能把内存搞坏！
+
 ## 13.2 unsafe.Pointer
 
 ### 四种指针关系
@@ -241,6 +260,18 @@ func equal(x, y reflect.Value, visited map[comparison]bool) bool {
 > - 自定义深度比较：可定制化（如忽略某些字段、特殊处理某些类型）
 
 ---
+
+### 大白话cgo
+
+cgo=让Go和C代码合作。
+
+就像让一个说中文的人和一个说英文的人交流，需要一个翻译。
+cgo就是这个翻译。
+
+// #include <stdio.h>
+import "C"
+
+C.puts("Hello") // Go调C语言的puts函数
 
 ## 13.4 通过cgo调用C代码
 

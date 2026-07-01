@@ -77,6 +77,15 @@ func SprintAny(vs interface{}) string { ... }
 
 ---
 
+### 大白话Type和Value
+
+Type=类型是什么（int, string, 学生...）
+Value=值是什么（42, "小明"...）
+
+var x int = 42
+t := reflect.TypeOf(x)  // t = int（类型）
+v := reflect.ValueOf(x) // v = 42（值本身）
+
 ## 12.2 reflect.Type和reflect.Value
 
 ### 两个核心类型

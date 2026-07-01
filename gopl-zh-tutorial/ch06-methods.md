@@ -1681,4 +1681,25 @@ c.F()  // 编译器自动往上找：C没有→B没有→A有→提升
 
 ---
 
+### 🧠 6.15 深度扩展：Stringer接口完整解析
+
+```go
+type Person struct{ Name string; Age int }
+func (p Person) String() string {
+    return fmt.Sprintf("%s(%d岁)", p.Name, p.Age)
+}
+
+func main() {
+    p := Person{"小明", 18}
+    fmt.Println(p)  // 小明(18岁)
+}
+
+fmt.Println内部：
+  1. 检查p是否实现了fmt.Stringer接口
+  2. 实现了→调p.String()
+  3. 没有→用反射输出 {Name 18}
+```
+
+---
+
 > **下一章**：[第7章 接口](./ch07-interfaces.md) —— 接口是合约、接口类型、接口值、类型断言、类型分支等。

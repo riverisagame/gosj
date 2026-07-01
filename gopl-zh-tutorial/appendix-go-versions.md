@@ -508,3 +508,77 @@ if valErr, ok := errors.AsType[*ValidationError](err); ok {
 > 本附录涵盖Go 1.22到1.27的全部重大变化。
 > Go 1.26.4是当前最新稳定版本。
 > 回到[首页](./README.md)。
+
+---
+
+## Go 1.27（预计2026年8月）：泛型方法
+
+**Go社区等待最久的新特性之一！**
+
+```go
+// 以前：方法不能有自己的类型参数
+// func (s MySlice) Transform[U any](f func(int) U) []U { }  // ❌
+
+// Go 1.27：方法可以有自己的类型参数！
+type MySlice []int
+
+func (ms MySlice) Transform[U any](f func(int) U) []U {
+    result := make([]U, len(ms))
+    for i, v := range ms {
+        result[i] = f(v)
+    }
+    return result
+}
+
+// 使用：
+ms := MySlice{1, 2, 3}
+strs := ms.Transform(func(n int) string {
+    return fmt.Sprintf("数%d", n)
+})
+// strs = ["数1", "数2", "数3"]
+```
+
+**限制：** 泛型方法不能用于实现接口方法。
+
+**其他变化：**
+```go
+// goroutineleak profile 正式可用
+// simd/archsimd 支持 ARM64 和 WebAssembly
+// @file 响应文件支持（像C编译器的 @file）
+// GODEBUG: gotypesalias 和 asynctimerchan 被移除
+```
+
+---
+
+## Go版本全景总结表
+
+| 版本 | 时间 | 关键特性 | 对开发者的影响 |
+|------|------|---------|--------------|
+| 1.0 | 2012.03 | 正式发布 | 一切开始 |
+| 1.1 | 2013.05 | race detector | 并发bug可检测 |
+| 1.3 | 2014.06 | 连续栈 | goroutine更快 |
+| 1.4 | 2014.12 | 2KB初始栈、go generate | 更多goroutine |
+| 1.5 | 2015.08 | 并发GC、GOMAXPROCS=CPU数 | GC不卡了 |
+| 1.7 | 2016.08 | SSA编译优化、context包 | 程序更快 |
+| 1.8 | 2017.02 | GC暂停<100μs、sort.Slice | 几乎无GC暂停 |
+| 1.9 | 2017.08 | 类型别名、sync.Map | 并发map不用愁 |
+| 1.11 | 2018.08 | Go Modules | 依赖管理革命 |
+| 1.13 | 2019.09 | 错误包装(%w)、数字字面量 | 错误追踪更清晰 |
+| 1.14 | 2020.02 | defer几乎零开销、抢占式调度 | defer随便用 |
+| 1.16 | 2021.02 | Go Modules默认、embed | 编译文件更方便 |
+| 1.17 | 2021.08 | 切片转数组指针、寄存器调用 | 性能再提升 |
+| **1.18** | **2022.03** | **泛型！** | **历史性版本** |
+| 1.19 | 2022.08 | atomic类型、内存模型修订 | 原子操作更安全 |
+| 1.20 | 2023.02 | PGO、unsafe.String、errors.Join | 编译优化 |
+| **1.21** | **2023.08** | **slices/maps包、max/min/clear** | **标准库大补全** |
+| **1.22** | **2024.02** | **循环变量修复** | **10年的bug终于修了** |
+| **1.23** | **2024.08** | **range-over-func迭代器** | **遍历任何东西** |
+| 1.24 | 2025.02 | 泛型类型别名 | 重构更方便 |
+| 1.25 | 2025.08 | Green Tea GC实验 | GC更清新 |
+| **1.26** | **2026.02** | **new初始化、Green Tea GC正式** | **当前最新** |
+| 1.27 | 2026.08(预计) | 泛型方法 | 方法也能泛型了 |
+
+---
+
+> **本附录涵盖Go从1.0到1.27的全部版本演进。**
+> 回到[首页](./README.md)。

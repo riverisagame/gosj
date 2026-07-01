@@ -1732,3 +1732,135 @@ func main() {
 ---
 
 > **下一章**：[第5章 函数](./ch05-functions.md) —— 函数声明、递归、多返回值、错误处理、defer、panic/recover。
+
+---
+
+### 🧠 4.13 纳米级知识点：内存连续、map哈希、结构体对齐、json解码、模板引擎
+
+#### 为什么连续内存重要？——缓存行
+
+```
+CPU缓存一次读取64字节（缓存行）
+数组[0]~[7] = 64字节 = 一次读完
+→ 你访问arr[0]时，arr[1]~arr[7]已经被读进缓存了
+→ arr[1]的访问：直接从缓存拿！快！
+
+链表：节点在内存里是分散的
+→ 访问node1时，node2不一定在附近
+→ 每次都要等内存读取
+→ 慢！
+
+就像：
+  连续的书：你拿第1本时顺手拿了第2本
+  分散的书：看完第1本，还得走几步去拿第2本
+```
+
+#### map哈希——计算存储位置的过程
+
+```
+map查找过程：
+  1. 对key计算哈希值（一个数字）
+     hash("alice") = 0x7f3a9b2c...
+  2. 取哈希值的低B位确定桶
+     假设B=3（8个桶）：0x... & 0x111 = 3号桶
+  3. 取哈希值的高8位作为"top hash"
+     快速筛选（8次比较→一次SIMD指令）
+  4. 遍历桶里的8个位置
+     先比top hash，一样再比完整key
+
+为什么哈希查找O(1)？
+  不管map里有1个元素还是100万个
+  计算哈希的时间都一样
+  只是常数时间！
+
+哈希冲突：不同的key算到同一个桶
+  → 链在同一个桶的溢出桶里
+  → 极端情况：所有key冲突→O(n)
+```
+
+#### 结构体对齐——为什么有填充？
+
+```
+CPU读内存是按块读的：
+  地址是8的倍数→一次读8字节
+  地址不是8的倍数→可能要读两次
+
+对齐保证：每个字段的起始地址都是它size的倍数
+
+bool(1B) → 1的倍数→任何地址都行
+int32(4B) → 4的倍数→地址必须是0,4,8,12...
+int64(8B) → 8的倍数→地址必须是0,8,16...
+
+填充（padding）就是为了凑对齐：
+  type T struct {
+      a bool    // 偏移0（1字节）
+      // 3字节填充 → 对齐到4
+      b int32   // 偏移4（4字节）
+      c int64   // 偏移8（8字节）
+  }  // 总16字节
+```
+
+#### JSON解码——把字符串变成Go结构体的过程
+
+```
+json.Unmarshal([]byte(`{"name":"Alice","age":30}`), &p)
+
+内部步骤：
+  1. 词法分析：拆成token
+     { "name" : "Alice" , "age" : 30 }
+     ↓    ↓      ↓      ↓    ↓   ↓
+     { 字符串  字符串  ,  字符串  数字  }
+
+  2. 语法分析：解析JSON结构
+     根是对象 → 遍历key-value
+     "name" → 字符串值 "Alice"
+     "age" → 数字值 30
+
+  3. 反射匹配：
+     遍历p.Type()的字段
+     找json标签等于"name"的字段
+     找json标签等于"age"的字段
+     设置值
+
+  4. 递归处理：JSON对象→Go结构体
+     JSON数组→Go切片
+     JSON数字→Go float64/int
+
+整个过程在 encoding/json 包内部
+完全基于反射实现
+```
+
+#### 模板引擎——动态生成文本
+
+```go
+tmpl := "Hello, {{.Name}}! You are {{.Age}} years old."
+t := template.Must(template.New("test").Parse(tmpl))
+t.Execute(os.Stdout, data)
+
+模板引擎工作原理：
+  1. 解析模板字符串
+     找到 {{ }} 标记
+     标记内的就是表达式
+
+  2. 编译模板
+     把模板变成"程序"（instructions）
+     比如：
+       instruction 0: 写入"Hello, "
+       instruction 1: 读取.Name
+       instruction 2: 写入"! You are "
+       instruction 3: 读取.Age
+       instruction 4: 写入" years old."
+
+  3. 执行
+     传入data
+     逐个执行instruction
+     输出到io.Writer
+
+html/template 比 text/template 多一步：
+  自动转义HTML特殊字符
+  < → &lt; → 防止XSS攻击
+```
+
+---
+
+> **下一章**：[第5章 函数](./ch05-functions.md) —— 函数声明、递归、多返回值、错误处理、defer、panic/recover。

@@ -1169,4 +1169,155 @@ any：任何类型都行
 
 ---
 
+---
+
+### ⚡ 7.9 接口的底层性能开销——给初中生
+
+#### 接口调用比直接调用慢多少？
+
+```go
+type Calculator interface {
+    Add(int, int) int
+}
+
+type MyCalc struct{}
+func (MyCalc) Add(a, b int) int { return a + b }
+
+// 直接调用：~2ns
+// 接口调用：~4ns
+// 反射调用：~500ns
+//
+// 结论：接口调用只慢一点点（2ns），可以忽略不计！
+// 不要因为性能避免使用接口
+```
+
+#### 接口为什么有性能开销？
+
+```go
+// 直接调用：编译器知道调用哪个函数
+calc := MyCalc{}
+calc.Add(1, 2)  // 编译时就知道：调用 MyCalc.Add
+
+// 接口调用：运行时才知道
+var c Calculator = MyCalc{}
+c.Add(1, 2)     // 运行时才查 itab 表，找到 MyCalc.Add
+```
+
+**接口调用的流程：**
+```
+1. 从接口值的tab中取出itab（类型信息）
+2. 从itab的fun数组中取出对应方法地址
+3. 跳转到方法执行
+
+多了一步"查找"，所以比直接调用慢一点点
+```
+
+**itab缓存机制：**
+```go
+// 接口类型+具体类型的配对会被缓存
+// 比如 Calculator + MyCalc 这个配对
+// 第一次遇到时创建，之后直接用缓存
+// 所以不是每次都新建，性能开销很小
+```
+
+**面试题：接口调用的性能在日常工程中有影响吗？**
+```
+没有影响。
+
+接口调用比直接调用慢约2ns
+2纳秒 = 0.000000002秒
+
+如果每秒调用100万次接口：
+  损失约2毫秒
+  
+相比之下，一次磁盘IO：
+  约10毫秒
+  
+所以，用接口才是正确的选择
+不要为了"性能"放弃接口带来的灵活性和可测试性
+```
+
+---
+
+---
+
+### ⚡ 7.10 再补5道大厂面试题（接口篇）
+
+**面试题8：接口值比较的时候，什么时候panic？**
+```go
+var a interface{} = []int{1, 2, 3}
+var b interface{} = []int{1, 2, 3}
+
+// fmt.Println(a == b)  // ❌ panic！切片不可比较
+
+// 规则：
+// 1. 类型不同 → 返回false
+// 2. 类型可比且值相等 → true
+// 3. 类型不可比（slice/map/function）→ panic！
+
+// 安全比较：用reflect.DeepEqual
+fmt.Println(reflect.DeepEqual(a, b))  // true
+```
+
+**面试题9：nil接口和nil指针接口的区别？**
+```go
+var p *int = nil   // nil指针
+var i interface{} = p  // 把nil指针放进接口
+
+fmt.Println(i == nil)  // false！！！
+
+// 为什么？
+// i = {type: *int, value: nil}
+// type != nil，所以i != nil
+```
+
+**面试题10：interface{}和any是什么关系？**
+```go
+// Go 1.18引入了 any
+// type any = interface{}
+
+// 两者完全等价！
+var a interface{}  
+var b any          // 和a是一样的
+
+// 但any更简洁，Go 1.18+官方推荐用any
+```
+
+**面试题11：什么时候用接口，什么时候用具体类型？**
+```
+用接口：
+  需要抽象行为时
+  需要mock测试时
+  需要解耦时
+
+用具体类型：
+  只有一个实现时（不要为单一实现定义接口）
+  返回数据时（"接受接口，返回结构体"）
+  性能关键的路径（虽然差异很小）
+```
+
+**面试题12：Stringer接口是什么？**
+```go
+// fmt.Stringer 是标准库最常用的接口之一
+type Stringer interface {
+    String() string
+}
+
+// 任何实现了String()方法的类型
+// 在fmt.Println时自动调用
+
+type Person struct {
+    Name string
+    Age  int
+}
+
+func (p Person) String() string {
+    return fmt.Sprintf("%s (%d岁)", p.Name, p.Age)
+}
+
+fmt.Println(Person{"小明", 18})  // 小明 (18岁)
+```
+
+---
+
 > **下一章**：[第8章 Goroutines和Channels](./ch08-goroutines-channels.md) —— Go并发的核心机制。

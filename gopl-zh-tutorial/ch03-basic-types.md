@@ -1198,4 +1198,90 @@ var f64 float64 = 123456789  // 123456789（准确）
 
 ---
 
+---
+
+### ⚡ 3.9 再补5道大厂面试题（基础数据类型篇）
+
+**面试题8：为什么Go的string是不可变的？**
+```
+1. 安全：多个变量可以共享底层字节数组，不会互相影响
+2. 高效：子串切片（s[1:5]）零拷贝，直接指向原内存
+3. map key：只有不可变类型才能做key
+4. 并发安全：多个goroutine可同时读同一字符串
+
+就像一张收据：你可以看，但不能改
+```
+
+**面试题9：'rune'到底是什么？为什么需要它？**
+```go
+// rune = int32的别名，表示一个Unicode码点
+// 
+// 为什么需要？
+// 因为一个中文字符在UTF-8中占3个字节
+// 如果按byte遍历，会看到乱码
+
+s := "Hello, 世界"
+
+// byte遍历（错误）：
+for i := 0; i < len(s); i++ {
+    fmt.Printf("%c", s[i])  // H e l l o ,   ä ̖ !乱码
+}
+
+// rune遍历（正确）：
+for _, r := range s {
+    fmt.Printf("%c", r)  // H e l l o ,   世 界
+}
+```
+
+**面试题10：0.1 + 0.2 != 0.3 怎么修复？**
+```go
+// 方法1：用误差比较
+const epsilon = 1e-9
+if math.Abs((0.1+0.2)-0.3) < epsilon {
+    fmt.Println("相等")
+}
+
+// 方法2：用整数
+// 比如计算金额时用分而不是元
+a := 10  // 0.1元 = 10分
+b := 20  // 0.2元 = 20分
+if a + b == 30 {  // 30分 = 0.3元
+    fmt.Println("相等")
+}
+
+// 方法3：用第三方包
+// github.com/shopspring/decimal
+```
+
+**面试题11：uintptr和unsafe.Pointer的区别？**
+```go
+// unsafe.Pointer：指针类型，GC能跟踪
+// uintptr：整数类型，GC不能跟踪
+
+x := 42
+p := unsafe.Pointer(&x)  // GC知道p指向x
+addr := uintptr(p)        // 只是一个数字，GC不知道它指向x
+
+// 如果x被GC移动了：
+// p → 指向x的新地址 ✅
+// addr → 还是旧地址 ❌（野指针！）
+```
+
+**面试题12：iota在const块中如何重置？**
+```go
+// iota在每个const块中从0开始
+
+const (
+    A = iota  // 0
+    B        // 1
+)
+
+const (
+    C = iota  // 0（从0重新开始！）
+    D        // 1
+)
+```
+
+---
+
 > **下一章**：[第4章 复合数据类型](./ch04-composite-types.md) —— 数组、Slice、Map、结构体、JSON和模板。

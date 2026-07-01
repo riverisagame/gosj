@@ -1527,4 +1527,93 @@ fmt.Println(evens)  // [2, 4]
 
 ---
 
+---
+
+### ⚡ 5.13 再补5道大厂面试题（函数篇）
+
+**面试题10：map作为函数参数，是传值还是传引用？**
+```go
+func modifyMap(m map[string]int) {
+    m["key"] = 42  // 会影响外面的map
+}
+
+// map是引用类型，但传的是"map header"的副本
+// header里有指向底层哈希表的指针
+// 所以函数内修改会影响外部
+
+// 但：如果函数内 m = make(map[string]int) 重新赋值
+// 不会影响外部！（因为m是副本）
+```
+
+**面试题11：可变参数的底层是什么样的？**
+```go
+func sum(nums ...int) int {
+    total := 0
+    for _, n := range nums {  // nums实际上是个[]int
+        total += n
+    }
+    return total
+}
+
+// ...int 在函数内部被编译为 []int
+// 编译器在调用处：
+//   sum(1, 2, 3) → sum([]int{1, 2, 3})
+//
+// 区别：
+// nums := []int{1, 2, 3}
+// sum(nums...)  // 展开，不创建新切片
+```
+
+**面试题12：什么是"函数类型"？可以当map的key吗？**
+```go
+// 函数类型 = 函数的签名
+// func(int, int) int 这是一个类型
+
+var fn func(int, int) int
+fn = func(a, b int) int { return a + b }
+
+// 函数不能做map的key（因为函数不可比较）
+// var m map[func()]int  // ❌ 编译错误
+```
+
+**面试题13：多个defer的执行顺序和参数求值？**
+```go
+func main() {
+    x := 1
+    defer fmt.Println("defer1:", x)  // 此时x=1被记录
+    
+    x = 2
+    defer fmt.Println("defer2:", x)  // 此时x=2被记录
+    
+    x = 3
+}
+// 输出：
+// defer2: 2  ← 后进的先出
+// defer1: 1  ← 先记录的值
+```
+
+**面试题14：defer能修改函数返回值吗？**
+```go
+// 只有命名返回值才可以！
+
+func f1() (result int) {
+    defer func() {
+        result += 10  // 修改命名返回值
+    }()
+    return 1  // result先设为1，defer改成11
+}
+// 返回11
+
+func f2() int {
+    var result int
+    defer func() {
+        result += 10  // 修改局部变量，不影响匿名返回值
+    }()
+    return 1  // 1被复制到匿名返回值，defer改的是result
+}
+// 返回1
+```
+
+---
+
 > **下一章**：[第6章 方法](./ch06-methods.md) —— 方法声明、指针接收器、嵌入扩展、封装。

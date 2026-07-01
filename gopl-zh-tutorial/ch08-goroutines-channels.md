@@ -2570,4 +2570,54 @@ Step 5: 释放旧栈
 
 ---
 
+### 🧠 8.15 纳米级知识点：goroutine调度、channel阻塞、select随机、context树、管道模式
+
+#### goroutine调度——Go运行时怎么分配CPU给goroutine
+
+```
+GMP模型：G=Goroutine, M=线程, P=处理器(数量=GOMAXPROCS)
+
+创建G→P本地队列→M取G执行
+G阻塞→M执行下一个G
+P空了→从别的P偷G（work stealing）
+系统调用→M和P解绑→P找新M
+核心：不需要切内核态，比线程切换快20倍
+```
+
+#### channel阻塞时goroutine去哪了
+
+```
+缓冲区满时发送：
+  创建sudog→放入sendq→gopark()挂起(G→_Gwaiting)
+  M去执行其他G
+对方接收后：goready()唤醒→G→_Grunnable→调度
+```
+
+#### select随机策略
+
+```
+select { case <-ch1: case <-ch2: }
+同时就绪：Go先洗牌（随机打乱顺序）再检查
+第一个就绪的执行——防止case被饿死
+```
+
+#### context树——取消传播
+
+```
+父取消→所有子取消（树向下传播）
+子取消→不影响父
+context持有子context列表，取消时遍历全部
+```
+
+#### 管道模式（Pipeline）
+
+```go
+for n := range sq(sq(gen(2, 3))) {
+    fmt.Println(n)  // 16, 81
+}
+// gen→sq→sq→打印，每阶段独立goroutine，channel连接
+```
+
+---
+
 > **下一章**：[第9章 基于共享变量的并发](./ch09-shared-vars-concurrency.md) —— 竞争条件、Mutex、RWMutex、内存同步、sync.Once和竞争检测。

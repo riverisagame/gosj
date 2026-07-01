@@ -1849,4 +1849,64 @@ c == d 的检查：
 
 ---
 
+### 🧠 7.14 纳米级知识点：动态派发、sort排序、http路由
+
+#### 动态派发——运行时才决定调用哪个函数
+
+```
+直接调用：编译时就知道调哪个函数
+  t.Method() → CALL t.Method（地址固定）
+
+接口调用（动态派发）：运行时才知道
+  var i Interface = t
+  i.Method() → 查itab→找Method地址→CALL
+
+就像：直接调用=打给小明（号码已知）
+     接口调用=打给"销售部"（号码要查通讯录）
+
+步骤：iface.tab→itab→itab.fun[索引]→跳转
+比直接调用多2步查找（约多2ns）
+```
+
+#### sort.Interface的三种排序方式
+
+```go
+type Person struct{ Name string; Age int }
+
+// 方式1：sort.Interface（3个方法）
+type ByAge []Person
+func (a ByAge) Len() int { return len(a) }
+func (a ByAge) Less(i,j int) bool { return a[i].Age < a[j].Age }
+func (a ByAge) Swap(i,j int) { a[i],a[j] = a[j],a[i] }
+sort.Sort(ByAge(people))
+
+// 方式2：sort.Slice（Go 1.8+，一行搞定）
+sort.Slice(people, func(i,j int) bool {
+    return people[i].Age < people[j].Age
+})
+
+// 方式3：稳定排序（相等时保持原顺序）
+sort.SliceStable(people, func(i,j int) bool {
+    return people[i].Age < people[j].Age
+})
+```
+
+#### http路由——请求找到handler的旅程
+
+```
+请求 /api/users
+  → net/http接收
+  → 创建ResponseWriter+解析Request
+  → ServeMux匹配：精确→最长前缀→/
+  → handler.ServeHTTP(w,r)
+  → 启动新goroutine处理
+
+DefaultServeMux局限：
+  只能路径匹配，不支持方法匹配(GET/POST)
+  不支持路径参数提取
+  生产环境用gin/echo框架
+```
+
+---
+
 > **下一章**：[第8章 Goroutines和Channels](./ch08-goroutines-channels.md) —— Go并发的核心机制。

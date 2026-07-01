@@ -1922,4 +1922,52 @@ RWMutex.RLock/RUnlock：~30,000,000次（3千万）
 
 ---
 
+### 🧠 9.14 纳米级知识点：锁粒度、Once实现、内存序
+
+#### 锁粒度——锁越大还是越小越好
+
+```
+粗粒度锁：一把锁保护所有数据（简单但并发低）
+细粒度锁：每个数据自己的锁（并发高但复杂）
+
+Go中：大多数用粗粒度，性能敏感时分片
+
+分片例子：32个map各有一把锁
+  不同key用不同map→不同锁→32倍并发
+```
+
+#### sync.Once源码——双重检查锁定
+
+```go
+func (o *Once) Do(f func()) {
+    if atomic.LoadUint32(&o.done) == 0 { // 第一重（无锁）
+        o.doSlow(f)
+    }
+}
+func (o *Once) doSlow(f func()) {
+    o.m.Lock()
+    defer o.m.Unlock()
+    if o.done == 0 { // 第二重（有锁）
+        defer atomic.StoreUint32(&o.done, 1)
+        f()
+    }
+}
+```
+
+#### 内存序——为什么需要happens-before
+
+```
+Goroutine A: x=1; y=1
+Goroutine B: if y==1 { print(x) }
+
+CPU可能重排→y先执行→B看到y=1时x还是0
+
+happens-before保证：
+  Mutex.Unlock() happen-before 下一个Lock()
+  channel发送 happen-before 接收
+  atomic.Store happen-before 看到新值
+```
+
+---
+
 > **下一章**：[第10章 包和工具](./ch10-packages-tools.md) —— 包的组织、导入路径、初始化、go工具链。

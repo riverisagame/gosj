@@ -1675,6 +1675,23 @@ func FuzzReverse(f *testing.F) {
 
 ---
 
+### 🧠 11.17 纳米级知识点：测试框架、stub、覆盖率统计、benchmark统计、pprof
+
+```
+go test过程：扫描*_test.go→找TestXxx→编译→执行
+t.Fatal→runtime.Goexit()退出当前goroutine
+
+stub（桩）：用接口模拟外部依赖（不真的发邮件）
+
+覆盖率：编译器插计数器，走过的行++
+
+benchmark：b.N从1翻倍直到够1秒
+
+pprof采样：每0.01秒记录CPU在哪→火焰图
+```
+
+---
+
 > **下一章**：[第12章 反射](./ch12-reflection.md) —— reflect.Type、reflect.Value、动态调用、结构体标签。
 
 ---

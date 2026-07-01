@@ -1101,4 +1101,172 @@ for m := range t.Methods() {  // m 是 reflect.Method
 
 ---
 
+---
+
+### ⚡ 12.12 反射的完整流程图集合
+
+#### 反射三定律图解
+
+```
+第一定律：接口值 → 反射对象
+┌────────┐    ┌──────────────┐
+│ interface │──→│ reflect.Value│
+│  x = 42   │    │  v = 42      │
+│           │──→│ reflect.Type │
+│           │    │  v = int     │
+└────────┘    └──────────────┘
+就像照镜子：人（实际值）→ 镜中像（反射对象）
+
+第二定律：反射对象 → 接口值
+┌──────────────┐    ┌────────┐
+│ reflect.Value│──→│ interface │
+│  v = 42      │    │  x = 42   │
+└──────────────┘    └────────┘
+从镜子回到现实
+
+第三定律：要修改值，必须传指针
+┌────────────────────┐
+│ v := reflect.Of(x)  │
+│ v.SetInt(100)  ❌   │← panic！不可设置
+├────────────────────┤
+│ p := reflect.Of(&x) │
+│ p.Elem().SetInt(100)│✅ 可以！
+└────────────────────┘
+只看镜子不能改变镜子里的人
+需要直接碰到那个人（指针）才能改变
+```
+
+#### reflect.Type vs reflect.Kind 的区别图
+
+```
+type MyInt int
+var x MyInt = 42
+v := reflect.TypeOf(x)
+
+v.Name() = "MyInt"     ← 类型名字（你起的名字）
+v.Kind() = "int"       ← 底层种类（底层是什么）
+
+就像：
+  MyInt = "小王"（名字）
+  int   = "人类"（种类）
+
+Name可能不同：MyInt, YourInt, HisInt → 名字不同
+Kind都一样：int → 底层种类一样
+```
+
+#### CanSet和可寻址性图解
+
+```
+var x int = 42
+         │
+         ├── reflect.ValueOf(x)
+         │     └── CanSet() = false  ❌
+         │         因为传的是x的副本，不是x本身
+         │
+         └── reflect.ValueOf(&x).Elem()
+               └── CanSet() = true   ✅
+                   因为传的是x的地址
+
+哪些值可寻址（CanSet=true）？
+  ✅ 变量
+  ✅ 指针解引用
+  ✅ 切片元素
+  ✅ 可寻址的结构体字段
+  
+哪些值不可寻址（CanSet=false）？
+  ❌ 函数返回值
+  ❌ map元素
+  ❌ 字符串里的字节
+  ❌ 常量
+```
+
+#### 反射调用方法的完整流程
+
+```
+         reflect.ValueOf(obj)
+                │
+                ▼
+        ┌───────────────┐
+        │ 找方法         │
+        │ v.MethodByName │
+        │ ("Add")       │
+        └───────┬───────┘
+                │
+                ▼
+        ┌───────────────┐
+        │ 准备参数        │
+        │ []reflect.Value│
+        │ {1的Value, 2的 │
+        │  Value}       │
+        └───────┬───────┘
+                │
+                ▼
+        ┌───────────────┐
+        │ method.Call    │
+        │ (args)         │
+        └───────┬───────┘
+                │
+                ▼
+        ┌───────────────┐
+        │ 返回结果        │
+        │ []reflect.Value│
+        └───────────────┘
+
+性能对比：
+  直接调用：    ~2ns
+  反射调用：    ~500ns（慢了250倍！）
+```
+
+#### 结构体标签的解析图
+
+```
+type User struct {
+    Name  string `json:"name"`
+    Age   int    `json:"age,omitempty"`
+    Pass  string `json:"-"`
+}
+          │
+          ▼
+反射遍历字段：
+┌─────────────────────────────────────┐
+│ Field 0: Name                       │
+│   Tag: `json:"name"`         │
+│   json tag = "name"                │
+├─────────────────────────────────────┤
+│ Field 1: Age                        │
+│   Tag: `json:"age,omitempty"`       │
+│   json tag = "age"                 │
+│   选项 = omitempty                  │
+├─────────────────────────────────────┤
+│ Field 2: Pass                       │
+│   Tag: `json:"-"`           │
+│   表示永远不输出到JSON              │
+└─────────────────────────────────────┘
+```
+
+#### TypeFor 和 Fields迭代器（Go 1.21+/1.26+）
+
+```
+Go 1.21+：reflect.TypeFor[T]
+  type T = reflect.TypeFor[int]()  ← 不需要创建实例！
+
+Go 1.26+：反射迭代器
+  以前（手动索引）：
+    t := reflect.TypeOf(User{})
+    for i := 0; i < t.NumField(); i++ {
+        f := t.Field(i)
+    }
+
+  现在（迭代器）：
+    for f := range t.Fields() {
+        fmt.Println(f.Name)
+    }
+
+  同样：
+    for m := range t.Methods()  ← 遍历方法
+    for f := range v.Fields()   ← 遍历值
+```
+
+---
+
 > **下一章**：[第13章 底层编程](./ch13-unsafe-cgo.md) —— unsafe包、cgo调用C代码等高级话题。

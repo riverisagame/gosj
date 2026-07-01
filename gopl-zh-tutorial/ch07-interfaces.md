@@ -1320,4 +1320,155 @@ fmt.Println(Person{"小明", 18})  // 小明 (18岁)
 
 ---
 
+---
+
+### ⚡ 7.11 接口的完整流程图集合
+
+#### 接口值的底层结构图
+
+```
+接口变量在内存里的实际样子：
+
+空接口 interface{}（eface）：
+┌──────────────────┐
+│ eface {           │
+│   _type *TypeInfo  │← 指向类型信息
+│   data  unsafe.Pointer│← 指向实际数据
+│ }                 │
+└──────────────────┘
+
+非空接口（iface，有方法）：
+┌──────────────────┐
+│ iface {           │
+│   tab  *itab       │← 类型+方法表
+│   data unsafe.Pointer│← 指向实际数据
+│ }                 │
+└──────────────────┘
+     │
+     ▼
+  itab {
+    inter *InterfaceType  ← 接口类型（如io.Writer）
+    _type *Type          ← 具体类型（如*os.File）
+    hash uint32          ← 快速比较
+    fun  [1]uintptr      ← 方法地址表（变长）
+  }
+```
+
+#### 接口赋值的过程图
+
+```
+var w io.Writer          ← w = {tab:nil, data:nil}
+     │
+     │ w = os.Stdout
+     ▼
+┌──────────────────────┐
+│ 1. 找*os.File类型     │
+│ 2. 查找io.Writer接口  │
+│ 3. 创建itab           │（也会查缓存）
+│    ├ inter = io.Writer  │
+│    ├ _type = *os.File   │
+│    └ fun[] = Write地址   │
+│ 4. data = os.Stdout地址│
+└──────────────────────┘
+     │
+     ▼
+w = {tab:&itab, data:&os.Stdout}
+```
+
+#### nil接口 vs 存nil指针的接口
+
+```
+var w io.Writer         ← 接口本身是nil
+w = {tab: nil, data: nil}
+w == nil → true ✅
+
+var buf *bytes.Buffer = nil
+w = buf                 ← 把nil指针放进接口
+w = {tab: *bytes.Buffer, data: nil}
+w == nil → false ❌   ← 经典陷阱！
+
+为什么？
+  tab不是nil（类型信息还在）
+  所以接口整体不是nil
+
+检查方法：
+  reflect.ValueOf(w).IsNil()
+```
+
+#### 类型断言流程图
+
+```
+var x interface{} = "hello"
+         │
+         │ x.(string)
+         ▼
+    ┌────────────────┐
+    │ x的动态类型     │
+    │ 是不是string？  │
+    └───────┬────────┘
+           │
+      ╭────┴────╮
+     是│        │否
+      ╎        ▼
+  ┌───┴────┐  ┌────────────────┐
+  │返回string│  │ 两种模式：      │
+  │"hello" │  ├────────────────┤  
+  └────────┘  │ s := x.(string)│→ panic!
+              │ s,ok:=x.(string)│→ ok=false
+              └────────────────┘
+```
+
+#### 类型switch流程图
+
+```
+          switch v.(type)
+               │
+               ▼
+      ┌──────────────────┐
+      │ 获取v的动态类型   │
+      └────────┬─────────┘
+               │
+         ╭─────┴─────────╮       
+         ▼               ▼
+  ┌──────────┐    ┌──────────────┐
+  │case int  │    │case string   │
+  │  打印整数│    │  打印字符串  │
+  └──────────┘    └──────────────┘
+         │               │
+         ▼               ▼
+  ┌──────────┐    ┌──────────────┐
+  │case bool │    │default       │
+  │  打印布尔│    │  "未知类型"  │
+  └──────────┘    └──────────────┘
+```
+
+#### 接口组合的乐高积木图
+
+```
+单个接口 = 一块积木：
+┌──────────┐
+│ Reader   │  Read()方法
+└──────────┘
+
+┌──────────┐
+│ Writer   │  Write()方法
+└──────────┘
+
+组合接口 = 拼起来的积木：
+┌──────────────────┐
+│ ReadWriter       │
+│ - Read()         │  ← 从Reader来
+│ - Write()        │  ← 从Writer来
+└──────────────────┘
+
+┌────────────────────────┐
+│ ReadWriteCloser        │
+│ - Read()               │  ← 从Reader来
+│ - Write()              │  ← 从Writer来
+│ - Close()              │  ← 从Closer来
+└────────────────────────┘
+```
+
+---
+
 > **下一章**：[第8章 Goroutines和Channels](./ch08-goroutines-channels.md) —— Go并发的核心机制。

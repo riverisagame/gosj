@@ -1092,4 +1092,64 @@ _, _ = getDB()      // 第二次：直接返回缓存的结果
 
 ---
 
+---
+
+### ⚡ 9.9 再补3道大厂面试题
+
+**面试题8：写一个并发安全的计数器**
+```go
+type SafeCounter struct {
+    val atomic.Int64
+}
+
+func (c *SafeCounter) Inc()  { c.val.Add(1) }
+func (c *SafeCounter) Dec()  { c.val.Add(-1) }
+func (c *SafeCounter) Val() int64 { return c.val.Load() }
+
+var c SafeCounter
+var wg sync.WaitGroup
+for i := 0; i < 1000; i++ {
+    wg.Add(1)
+    go func() { c.Inc(); wg.Done() }()
+}
+wg.Wait()
+fmt.Println(c.Val())  // 1000
+```
+
+**面试题9：RWMutex什么时候比Mutex好？**
+```
+RWMutex = 读写锁
+  读锁（RLock）：多个goroutine同时加读锁
+  写锁（Lock）：互斥
+
+读远多于写时RWMutex快
+读1万次/写1次 → RWMutex
+读写相当 → Mutex
+```
+
+**面试题10：Cond条件变量用法**
+```go
+var mu sync.Mutex
+cond := sync.NewCond(&mu)
+var ready bool
+
+// 等待者
+func waiter() {
+    mu.Lock()
+    for !ready { cond.Wait() }
+    fmt.Println("条件满足，继续")
+    mu.Unlock()
+}
+
+// 通知者
+func notifier() {
+    mu.Lock()
+    ready = true
+    cond.Signal()  // 叫醒一个
+    mu.Unlock()
+}
+```
+
+---
+
 > **下一章**：[第10章 包和工具](./ch10-packages-tools.md) —— 包的组织、导入路径、初始化、go工具链。

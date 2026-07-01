@@ -1014,4 +1014,108 @@ func TestConcurrentCode(t *testing.T) {
 
 ---
 
+---
+
+### ⚡ 11.12 t.Parallel、测试缓存、httptest详解
+
+#### t.Parallel()——并行测试
+
+```go
+// Go默认按顺序执行测试
+// 但如果你的测试不互相影响，可以并行
+
+func TestSlow1(t *testing.T) {
+    t.Parallel()  // 标记为可并行
+    time.Sleep(2 * time.Second)
+}
+
+func TestSlow2(t *testing.T) {
+    t.Parallel()
+    time.Sleep(2 * time.Second)
+}
+
+// 顺序执行：4秒
+// 并行执行：2秒（两个同时跑！）
+
+// 注意：并行测试不能共享变量！
+```
+
+#### 测试缓存——为什么第二次那么快？
+
+```bash
+# 第一次运行：
+go test ./...  # 编译+测试，3秒
+
+# 第二次运行（源码没变）：
+go test ./...  # 直接输出 cached，0.1秒！
+
+# Go的测试缓存机制：
+# 1. 编译结果缓存
+# 2. 测试结果缓存（ok 或 FAIL）
+# 3. 只有源码或依赖变了才重新测试
+
+# 跳过缓存：
+go test -count=1 ./...
+
+# 清理测试缓存：
+go clean -testcache
+```
+
+#### httptest——测试HTTP服务器
+
+```go
+import "net/http/httptest"
+
+func TestHelloHandler(t *testing.T) {
+    // 创建测试服务器
+    ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintln(w, "Hello, World!")
+    }))
+    defer ts.Close()  // 测试完后关闭
+    
+    // 发送请求
+    resp, err := http.Get(ts.URL + "/hello")
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer resp.Body.Close()
+    
+    // 验证响应
+    body, _ := io.ReadAll(resp.Body)
+    if string(body) != "Hello, World!\n" {
+        t.Errorf("got %q, want %q", body, "Hello, World!\n")
+    }
+}
+```
+
+#### golden file测试模式
+
+```go
+// golden file = 把预期输出存到文件里
+// 避免在测试代码里写超长字符串
+
+var update = flag.Bool("update", false, "更新golden文件")
+
+func TestGolden(t *testing.T) {
+    got := myFunction()
+    
+    golden := filepath.Join("testdata", t.Name()+".golden")
+    
+    if *update {
+        os.WriteFile(golden, []byte(got), 0644)
+        return
+    }
+    
+    want, _ := os.ReadFile(golden)
+    if got != string(want) {
+        t.Errorf("输出不匹配\ngot:\n%s\nwant:\n%s", got, want)
+    }
+}
+
+// 运行：go test -update   → 更新所有golden文件
+// 正常：go test           → 和golden文件比较
+```
+
+---
+
 > **下一章**：[第12章 反射](./ch12-reflection.md) —— reflect.Type、reflect.Value、动态调用、结构体标签。

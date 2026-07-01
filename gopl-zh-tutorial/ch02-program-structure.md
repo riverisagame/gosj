@@ -1231,4 +1231,163 @@ type MyInt int
 
 ---
 
+---
+
+### ⚡ 2.13 iota、nil、类型声明、短声明——完整用法大全
+
+#### iota的完整用法大全（给初中生）
+
+```go
+// iota = "自动递增的计数器"
+// 只在 const 块中有效
+
+// 基本用法：
+const (
+    A = iota  // 0
+    B        // 1
+    C        // 2
+)
+
+// 跳过值：
+const (
+    _ = iota  // 0（丢弃）
+    X         // 1
+    Y         // 2
+)
+
+// 位运算标志（经典面试题）：
+const (
+    Read  = 1 << iota  // 1 << 0 = 1
+    Write              // 1 << 1 = 2
+    Exec               // 1 << 2 = 4
+    Admin              // 1 << 3 = 8
+)
+
+// 字节单位：
+const (
+    _  = iota
+    KB = 1 << (10 * iota)  // 1 << 10 = 1024
+    MB                     // 1 << 20 = 1048576
+    GB                     // 1 << 30 = 1073741824
+)
+
+// iota在每个const块中重置：
+const (
+    A = iota  // 0
+    B        // 1
+)
+const (
+    C = iota  // 0（重新从0开始！）
+    D        // 1
+)
+```
+
+#### nil用法大全
+
+```go
+// nil 在Go中有多重含义，取决于用在什么类型上
+
+// 1. nil指针
+var p *int = nil
+fmt.Println(p == nil)  // true
+
+// 2. nil切片
+var s []int = nil
+fmt.Println(s == nil)  // true
+s = append(s, 1)        // nil切片可以append！
+
+// 3. nil map
+var m map[string]int = nil
+// m["key"] = 1        // ❌ panic!
+_ = m["key"]            // ✅ 读nil map返回零值
+len(m)                   // ✅ 0
+delete(m, "key")         // ✅ no-op
+
+// 4. nil channel
+var ch chan int = nil
+// ch <- 1              // ❌ 永远阻塞
+// <-ch                 // ❌ 永远阻塞
+
+// 5. nil函数
+var fn func() = nil
+// fn()                 // ❌ panic!
+fn = func() { fmt.Println("hi") }
+fn()                     // ✅ hi
+
+// 6. nil接口
+var iface interface{} = nil
+fmt.Println(iface == nil)  // true
+
+// 但注意：存了nil指针的接口不是nil！
+var buf *bytes.Buffer = nil
+iface = buf
+fmt.Println(iface == nil)  // false！经典面试陷阱
+```
+
+#### 类型声明详解
+
+```go
+// Go有5种声明，类型声明是其中之一
+
+// 1. 新类型（type NewType OldType）
+type Celsius float64  // 创建一个新类型
+var c Celsius = 100.0
+// float64(c)  // 需要显式转换
+
+// 2. 类型别名（type Alias = OldType）
+type MyInt = int  // MyInt和int是同一类型
+var x MyInt = 42
+var y int = x     // ✅ 不需要转换！
+
+// 3. 结构体类型
+type Person struct {
+    Name string
+    Age  int
+}
+
+// 4. 接口类型
+type Writer interface {
+    Write([]byte) (int, error)
+}
+
+// 5. 函数类型
+type Handler func(http.ResponseWriter, *http.Request)
+
+// 6. map/slice/channel类型
+type IntSlice []int
+type StringMap map[string]string
+type DoneChan chan struct{}
+```
+
+#### 短变量声明规则（必考面试题）
+
+```go
+// 规则1：至少有一个新变量
+x := 10      // ✅ x是新变量
+x, y := 20, 30  // ✅ x已有（赋值），y是新变量
+// x := 30    // ❌ 编译错误：左边没有新变量
+
+// 规则2：只能在函数内部使用
+var a = 10    // ✅ 包级别
+// b := 20    // ❌ 包级别不能使用:=
+
+// 规则3：短声明的变量类型由初始化值决定
+name := "Alice"  // string
+count := 42       // int
+pi := 3.14       // float64
+
+// 规则4：短声明可以和函数返回值配合
+f, err := os.Open("file.txt")
+// f 是 *os.File, err 是 error
+
+// 规则5：短声明在多重赋值中有特殊行为
+// 如果:=左边有多个变量，只要至少一个是新变量，其他可以是已存在的
+
+x := 1
+y := 2
+x, z := 3, 4  // x被重新赋值（已存在），z是新变量
+```
+
+---
+
 > **下一章**：[第3章 基础数据类型](./ch03-basic-types.md) —— 深入Go的整型、浮点数、复数、布尔、字符串和常量系统。

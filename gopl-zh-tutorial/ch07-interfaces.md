@@ -1471,4 +1471,242 @@ var x interface{} = "hello"
 
 ---
 
+---
+
+### ⚡ 7.12 接口完整纳米级图解大全
+
+#### io.Writer 和 io.Reader 接口关系图
+
+```
+          io.Writer               io.Reader
+      ┌──────────────┐      ┌──────────────┐
+      │ Write(p []byte)│      │ Read(p []byte)│
+      │ (int, error)  │      │ (int, error)  │
+      └──────────────┘      └──────────────┘
+              │                      │
+     ┌────────┴────────┐     ┌───────┴────────┐
+     │ 哪些类型实现了？  │     │ 哪些类型实现了？ │
+     ▼                       ▼
+  ┌──────────────┐      ┌──────────────┐
+  │ *os.File     │      │ *os.File     │
+  │ *bytes.Buffer│      │ *bytes.Buffer│
+  │ net.Conn     │      │ net.Conn     │
+  │ os.Stdout    │      │ strings.NewR │
+  │ http.RespWri │      │ stdin        │
+  └──────────────┘      └──────────────┘
+
+接口组合：
+┌──────────────┐
+│  io.ReadWriter │
+│  = Reader     │  ← Read + Write 都有
+│  + Writer     │
+└──────────────┘
+
+就像：
+  一只狗：
+    ┌────────┐
+    │ 叫()   │ → 所有狗都会叫
+    │ 跑()   │ → 所有狗都会跑
+    └────────┘
+  
+  当你需要一个"会叫会跑的动物"：
+  interface { 叫(); 跑() }
+  狗自动满足（不需要写implements）
+```
+
+#### sort.Interface 完整实现图
+
+```go
+type Interface interface {
+    Len() int           // 长度
+    Less(i, j int) bool // 比较大小
+    Swap(i, j int)      // 交换位置
+}
+
+自定义排序示例：
+
+type Movie struct {
+    Title string
+    Year  int
+}
+
+type byYear []Movie
+
+func (s byYear) Len() int           { return len(s) }
+func (s byYear) Less(i, j int) bool { return s[i].Year < s[j].Year }
+func (s byYear) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+执行流程：
+
+   sort.Sort(byYear(movies))
+        │
+        ▼
+   ┌──────────────────────────┐
+   │ sort包内部：              │
+   │ 1. 调用 Len() = 5        │
+   │ 2. Less(0,1) → 1994<1999?│
+   │ 3. true → 不交换         │
+   │ 4. Less(1,2) → 1999<1972?│
+   │ 5. false → Swap(1,2)    │
+   │ 6. ...快速排序循环...    │
+   └──────────────────────────┘
+        │
+        ▼
+   排序完成！
+
+更简单的替代方案（Go 1.8+）：
+  sort.Slice(movies, func(i, j int) bool {
+      return movies[i].Year < movies[j].Year
+  })
+```
+
+#### http.Handler 接口的工作原理图
+
+```
+       浏览器请求
+          │
+          ▼
+    ┌──────────────────┐
+    │ net/http 服务器    │
+    │ 收到HTTP请求      │
+    └────────┬─────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │ 创建ResponseWriter│
+    │ 和Request对象    │
+    └────────┬─────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │ 启动goroutine处理 │
+    │ go handler.ServeH │
+    │ (w, r)           │
+    └────────┬─────────┘
+             │
+             ▼
+    ┌──────────────────────────────┐
+    │ handler 可以是：              │
+    │                              │
+    │ ├── http.HandlerFunc(函数)   │
+    │ │    func(w, r) { ... }      │
+    │ │    → 自动适配为Handler    │
+    │ │                            │
+    │ ├── 自定义结构体（有ServeHTTP）│
+    │ │    type MyHandler struct{} │
+    │ │    func (m *MyHandler)     │
+    │ │        ServeHTTP(...)      │
+    │ │                            │
+    │ └── DefaultServeMux路由器    │
+    │     根据URL.Path选择handler  │
+    └──────────────────────────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │ 响应写入 w       │
+    │ status + body    │
+    └──────────────────┘
+```
+
+#### 类型断言的底层检查图
+
+```
+var x interface{} = "hello"
+
+x.(string) 在运行时：
+         │
+         ▼
+    ┌───────────────────────┐
+    │ 读取x的eface结构       │
+    │ _type 和 data         │
+    └──────────┬────────────┘
+               │
+               ▼
+    ┌───────────────────────┐
+    │ 比较_type == string类型│
+    │ 的元信息               │
+    └──────────┬────────────┘
+               │
+           ╔═══╧═══╗
+        相同↓     ↓不同
+           │       │
+     ┌─────┴──┐  ┌─┴──────────────┐
+     │ 返回data│  │ ok模式？       │
+     │ 强转str│  ├───────┬───────┤
+     └────────┘  │是→nil│否→panic│
+                  │false │       │
+                  └──────┴───────┘
+
+效率：
+  类型断言（成功）：~2ns
+  类型断言（失败，ok模式）：~2ns
+  类型switch（每个case）：~1-2ns
+```
+
+#### 空接口 interface{} 存任何值
+
+```
+        interface{} (空接口)
+              │
+    ┌─────────┼─────────┐
+    │         │         │
+    ▼         ▼         ▼
+┌──────┐ ┌──────┐ ┌──────────┐
+│int 42│ │string│ │[]int    │
+│      │ │"hello│ │{1,2,3}  │
+└──────┘ └──────┘ └──────────┘
+    │         │         │
+    ▼         ▼         ▼
+存入时自动装箱（boxing）：
+  ┌─────────────────────────────┐
+  │ eface {                     │
+  │   _type: int                │
+  │   data: 指向42的指针       │ ← 42被复制到堆上
+  │ }                            │
+  └─────────────────────────────┘
+
+取出时断言：
+  v := x.(int)  // 你必须知道存的是什么类型
+
+fmt.Println(x)  // 不需要知道类型，Println内部自动处理
+```
+
+#### 接口值的零值和比较图
+
+```
+接口的零值是nil：
+  var r io.Reader
+  r == nil  → true
+
+接口比较规则：
+  类型不同 → false
+  类型相同且可比 → 比较值
+  类型相同且不可比（slice/map/func）→ panic！
+
+                  val == nil
+                      │
+                      ▼
+            ┌────────────────────┐
+            │ val是接口类型吗？    │
+            └────────┬───────────┘
+                  是↓│  ↓不是
+                     │ │
+              ┌──────┴─┴──────┐
+              │ 检查tab和data  │ → 普通nil检查
+              │ 都nil才true    │
+              └──────┬────────┘
+                     │
+                ╔═════╧═══════╗
+                │ tab==nil?   │
+             是↓│  ↓否
+                │             │
+           ┌────┴──┐  ┌──────┴───────────┐
+           │true  │  │ false（经典陷阱！）│
+           │      │  │ 存了nil指针的接口  │
+           └──────┘  │ 不是nil接口！     │
+                      └──────────────────┘
+```
+
+---
+
 > **下一章**：[第8章 Goroutines和Channels](./ch08-goroutines-channels.md) —— Go并发的核心机制。

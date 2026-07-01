@@ -1269,4 +1269,205 @@ Go 1.26+：反射迭代器
 
 ---
 
+---
+
+### ⚡ 12.14 反射更多图解大全
+
+#### 反射在JSON编码中的应用图
+
+```
+json.Marshal(user)
+       │
+       ▼
+┌──────────────────────────────┐
+│ reflect.TypeOf(user)         │
+│ 遍历所有字段：               │
+│                              │
+│ for i := 0; i < t.NumField()│
+│   f := t.Field(i)            │
+│   jsonTag := f.Tag.Get(json) │ ← 读标签
+│   if jsonTag == "-" {跳过}  │
+│   val := v.Field(i)          │
+│   根据val.Kind()选择编码方式  │
+│   写入bytes.Buffer           │
+└──────────────────────────────┘
+       │
+       ▼
+{"name":"Alice","age":30}
+
+整个过程完全基于反射！
+没有反射就没有json.Marshal
+```
+
+#### 反射创建对象的流程图
+
+```
+根据类型名创建对象（工厂模式）：
+
+        字符串 "Person"
+               │
+               ▼
+     ┌───────────────────────┐
+     │ 注册的类型映射表       │
+     │ "Person" → Person类型  │
+     │ "Car" → Car类型       │
+     └──────────┬────────────┘
+                │
+                ▼
+     ┌───────────────────────┐
+     │ reflect.New(personType)│
+     │ → 创建*Person         │
+     │ → 所有字段零值        │
+     └──────────┬────────────┘
+                │
+                ▼
+     ┌───────────────────────┐
+     │ 设置字段值            │
+     │ v.Elem().FieldByName  │
+     │ ("Name").SetString("X")│
+     └───────────────────────┘
+
+代码实现：
+var typeRegistry = make(map[string]reflect.Type)
+
+func RegisterType(v interface{}) {
+    t := reflect.TypeOf(v)
+    if t.Kind() == reflect.Ptr {
+        t = t.Elem()
+    }
+    typeRegistry[t.Name()] = t
+}
+
+func Create(name string) interface{} {
+    if t, ok := typeRegistry[name]; ok {
+        return reflect.New(t).Interface()
+    }
+    return nil
+}
+
+// 注册
+RegisterType(Person{})
+RegisterType(Car{})
+
+// 使用
+p := Create("Person")  // *Person，所有字段零值
+```
+
+#### 反射三大定律的完整注释图
+
+```
+第一定律：接口值 → 反射对象
+  var x float64 = 3.14
+  ┌──────────────────────┐          ┌──────────────────┐
+  │ interface{} {        │ ──────→ │ reflect.Value    │
+  │   type: float64      │ TypeOf  │   v = 3.14       │
+  │   value: 3.14        │────────→ │┌────────────────┐│
+  │ }                    │ ValueOf ││reflect.Type    ││
+  └──────────────────────┘          ││  float64       ││
+                                     │└────────────────┘│
+                                     └──────────────────┘
+
+第二定律：反射对象 → 接口值
+  v := reflect.ValueOf(x)
+  y := v.Interface().(float64)
+  ┌──────────────────┐          ┌──────────────────────┐
+  │ reflect.Value    │ ──────→ │ interface{} {        │
+  │   v = 3.14       │          │   type: float64      │
+  └──────────────────┘          │   value: 3.14        │
+                                 └──────────────────────┘
+
+第三定律：要修改值，必须传指针
+  x := 3.14
+  v := reflect.ValueOf(x)
+  v.SetFloat(2.71)  →  panic ❌
+  ┌────┐    ┌──────────────┐
+  │ x=3.14│← │ v(副本=3.14)│
+  └────┘    └──────────────┘
+  修改的是副本，不是x
+
+  p := reflect.ValueOf(&x).Elem()
+  p.SetFloat(2.71)  → 成功 ✅
+  ┌──────┐    ┌──────────────┐
+  │ x=2.71│← │ p指向x      │
+  └──────┘    └──────────────┘
+  通过指针修改了x
+```
+
+#### reflect.DeepEqual 的递归比较图
+
+```
+reflect.DeepEqual(a, b) → bool
+
+比较规则（递归）：
+
+  1. 类型不同 → false
+  2. 基本类型 → 直接==比较
+  3. 指针 → 比较指向的值
+  4. 数组/切片 → 逐个元素比较
+  5. 结构体 → 逐个字段比较
+  6. map → 逐个key-value比较
+  7. slice/map/func和nil比较 → false
+
+示例：
+  a := []int{1, 2, 3}
+  b := []int{1, 2, 3}
+  
+  DeepEqual(a, b)
+       │
+       ▼
+  ┌────────────────────────┐
+  │ a.Kind() = Slice       │
+  │ b.Kind() = Slice       │ ← 类型相同
+  │ a.Len() == b.Len() = 3│
+  │ a[0]==b[0]? 1==1 ✅   │
+  │ a[1]==b[1]? 2==2 ✅   │
+  │ a[2]==b[2]? 3==3 ✅   │
+  └────────────────────────┘
+       │
+       ▼
+     true
+
+注意：DeepEqual({}, []int(nil)) = false
+  结构体{}和[]int(nil)类型不同
+```
+
+#### MakeSlice MakeMap 创建容器图
+
+```
+        reflect.MakeSlice
+              │
+              ▼
+    ┌────────────────────────┐
+    │ sliceType := SliceOf(   │
+    │   reflect.TypeOf(0))   │
+    │ → []int               │
+    │                        │
+    │ s := MakeSlice(        │
+    │   sliceType, 0, 10)   │
+    │ → 创建 []int, cap=10  │
+    │ → 返回 reflect.Value  │
+    └────────────────────────┘
+
+        reflect.MakeMap
+              │
+              ▼
+    ┌────────────────────────┐
+    │ mapType := MapOf(      │
+    │   TypeOf(""),         │
+    │   TypeOf(0))           │
+    │ → map[string]int      │
+    │                        │
+    │ m := MakeMap(mapType)  │
+    │ → 创建空map           │
+    │ → 返回 reflect.Value  │
+    └────────────────────────┘
+
+使用：
+  m.SetMapIndex(ValueOf("a"), ValueOf(1))
+  m.MapIndex(ValueOf("a"))  // 读
+  m.MapKeys()  // 所有key
+```
+
+---
+
 > **下一章**：[第13章 底层编程](./ch13-unsafe-cgo.md) —— unsafe包、cgo调用C代码等高级话题。

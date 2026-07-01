@@ -2207,4 +2207,201 @@ iter.Pull 把push转为pull：
 
 ---
 
+---
+
+### ⚡ 8.13 大厂面试题扩展（并发篇·10道）
+
+**面试题1：goroutine和线程的区别？**
+```
+                Goroutine              系统线程
+初始栈：          2KB                    1MB
+创建速度：        200ns                  1μs（快50倍）
+切换成本：        50ns（用户态）         1μs（内核态）
+数量上限：        百万级                 几千
+调度方式：        Go运行时协作+抢占式      OS内核抢占式
+
+goroutine ≈ 轻量级线程
+Go运行时在少量线程上调度大量goroutine（M:N模型）
+```
+
+**面试题2：什么是Goroutine泄漏？怎么检测？**
+```
+泄漏 = goroutine永远结束不了
+
+常见原因：
+  1. channel没人读/没人写
+  2. for select没有退出条件
+  3. 死锁
+  4. time.Sleep时间太长
+
+检测方法：
+  1. runtime.NumGoroutine() 看数量变化
+  2. http://localhost:6060/debug/pprof/goroutine
+  3. 测试中比较前后goroutine数
+```
+
+**面试题3：无缓冲channel和有缓冲channel什么区别？**
+```
+无缓冲：
+  make(chan int)
+  发送方和接收方必须同时准备好
+  → 同步通信
+  适合：goroutine间同步
+
+有缓冲：
+  make(chan int, 3)
+  发送方可以放进去就走（不满的时候）
+  → 异步通信
+  适合：工作池、限流、解耦
+```
+
+**面试题4：关闭一个已经关闭的channel会发生什么？**
+```go
+ch := make(chan int)
+close(ch)
+close(ch)  // panic: close of closed channel！
+
+// 从已关闭的channel读：返回零值
+ch <- 1  // panic: send on closed channel！
+
+// 安全关闭模式：
+var mu sync.Mutex
+var closed bool
+
+func SafeClose(ch chan int) {
+    mu.Lock()
+    if !closed {
+        close(ch)
+        closed = true
+    }
+    mu.Unlock()
+}
+```
+
+**面试题5：for range channel 和 for 循环读取有什么区别？**
+```go
+ch := make(chan int, 3)
+ch <- 1; ch <- 2; ch <- 3; close(ch)
+
+// for range：自动直到channel关闭
+for v := range ch {
+    fmt.Println(v)  // 1,2,3
+}
+
+// 等价于：
+for {
+    v, ok := <-ch
+    if !ok { break }
+    fmt.Println(v)
+}
+
+// for range的好处：
+// 1. 代码简洁
+// 2. 自动处理关闭
+// 3. channel为nil时永远阻塞（不是panic）
+```
+
+**面试题6：怎么限制goroutine的并发数？**
+```go
+// 方法1：信号量（Semaphore）
+sem := make(chan struct{}, 10)  // 最多10个
+
+for i := 0; i < 100; i++ {
+    sem <- struct{}{}
+    go func(id int) {
+        defer func() { <-sem }()
+        // 干活...
+    }(i)
+}
+
+// 方法2：固定worker数
+jobs := make(chan int, 100)
+for w := 0; w < 10; w++ {
+    go worker(w, jobs)
+}
+```
+
+**面试题7：select中如果多个case同时就绪，怎么选择？**
+```
+Go运行时随机公平选择一个！
+
+不是顺序检查！
+不是第一个就执行第一个！
+
+故意这样做：
+  防止开发者依赖选择顺序
+  保证每个case都有公平的执行机会
+
+如果想让某个case优先：
+  用两个select嵌套
+  或者把优先的放default外独立检查
+```
+
+**面试题8：context.WithValue怎么用才正确？**
+```go
+type contextKey string
+
+const userIDKey contextKey = "userID"
+
+// 存
+ctx := context.WithValue(context.Background(), userIDKey, 123)
+
+// 取
+if uid, ok := ctx.Value(userIDKey).(int); ok {
+    fmt.Println(uid)
+}
+
+// 为什么key要用自定义类型？
+// 防止不同包key冲突！都用"userID"字符串就会覆盖
+// 自定义类型只有本包能创建，不会冲突
+```
+
+**面试题9：context.Background()和context.TODO()有什么区别？**
+```
+context.Background()：
+  - 空的Context
+  - 永远不取消
+  - 通常在main函数和初始化用
+
+context.TODO()：
+  - 也是空的Context
+  - 语义上表示"还没想好用什么Context"
+  - 最终应该被替换为WithCancel/WithTimeout等
+```
+
+**面试题10：什么是发布-订阅模式？用Go怎么实现？**
+```go
+type PubSub struct {
+    mu   sync.RWMutex
+    subs map[string][]chan string
+}
+
+func (ps *PubSub) Subscribe(topic string) <-chan string {
+    ch := make(chan string, 1)
+    ps.mu.Lock()
+    ps.subs[topic] = append(ps.subs[topic], ch)
+    ps.mu.Unlock()
+    return ch
+}
+
+func (ps *PubSub) Publish(topic, msg string) {
+    ps.mu.RLock()
+    for _, ch := range ps.subs[topic] {
+        select {
+        case ch <- msg:  // 非阻塞发送
+        default:  // 没人收就跳过
+        }
+    }
+    ps.mu.RUnlock()
+}
+
+// 使用：
+ps := &PubSub{subs: make(map[string][]chan string)}
+ch := ps.Subscribe("news")
+ps.Publish("news", "Hello!")
+fmt.Println(<-ch)  // Hello!
+```
+
+---
+
 > **下一章**：[第9章 基于共享变量的并发](./ch09-shared-vars-concurrency.md) —— 竞争条件、Mutex、RWMutex、内存同步、sync.Once和竞争检测。

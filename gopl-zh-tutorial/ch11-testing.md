@@ -1500,4 +1500,179 @@ TestDivide
 
 ---
 
+---
+
+### ⚡ 11.15 大厂面试题扩展（测试篇·10道）
+
+**面试题1：单元测试和基准测试的文件名有什么要求？**
+```go
+// 文件名必须以 _test.go 结尾
+// calc.go → calc_test.go ✅
+// calc_test.go → 被go test识别
+// calc_check.go → ❌ 不是测试文件
+
+// 测试函数：TestXxx(t *testing.T)
+// 基准测试：BenchmarkXxx(b *testing.B)
+// 示例函数：ExampleXxx()
+```
+
+**面试题2：t.Error 和 t.Fatal 的区别？**
+```go
+func TestExample(t *testing.T) {
+    // t.Error：记录错误但继续执行
+    t.Error("出错了")  // 继续执行后面的代码
+    fmt.Println("我还会执行")  // ✅
+    
+    // t.Fatal：记录错误并立即停止
+    t.Fatal("严重错误")  // 立即退出这个测试函数
+    fmt.Println("我不会执行")  // ❌ 不执行
+}
+```
+
+**面试题3：go test -v 和 go test -run 有什么用？**
+```bash
+# -v：详细输出（显示每个测试的PASS/FAIL）
+go test -v ./...
+
+# -run：只运行匹配的测试（支持正则）
+go test -run TestAdd        # 只运行TestAdd
+go test -run TestAdd/正数   # 只运行子测试
+```
+
+**面试题4：测试覆盖率怎么生成和查看？**
+```bash
+# 生成覆盖率数据
+go test -coverprofile=cover.out ./...
+
+# 终端查看每个函数的覆盖率
+go tool cover -func=cover.out
+
+# 浏览器查看（绿色=覆盖，红色=未覆盖）
+go tool cover -html=cover.out
+```
+
+**面试题5：怎么跳过测试缓存？什么时候需要？**
+```bash
+# 默认：源码没变就用缓存结果
+# 第二次运行：cached（0.1秒）
+
+# 跳过缓存：
+go test -count=1 ./...
+
+# 什么时候跳过？
+# 1. 改了外部依赖但Go不知道
+# 2. 测试依赖系统时间/网络
+# 3. CI/CD中确保每次都重新测
+```
+
+**面试题6：怎么测试一个会panic的函数？**
+```go
+func Divide(a, b int) int {
+    if b == 0 {
+        panic("除数不能为0")
+    }
+    return a / b
+}
+
+func TestDividePanic(t *testing.T) {
+    defer func() {
+        if r := recover(); r == nil {
+            t.Error("应该panic但没有")
+        }
+    }()
+    Divide(10, 0)  // 应该panic
+}
+```
+
+**面试题7：子测试（t.Run）有什么好处？**
+```go
+func TestMath(t *testing.T) {
+    tests := []struct{
+        name string
+        a, b, want int
+    }{
+        {"加+加", 1, 2, 3},
+        {"负数", -1, -2, -3},
+        {"零值", 0, 0, 0},
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := Add(tt.a, tt.b)
+            if got != tt.want {
+                t.Errorf("got %d, want %d", got, tt.want)
+            }
+        })
+    }
+}
+
+// 好处：
+// 1. 每个子测试独立运行
+// 2. 一个失败不影响其他
+// 3. 可以单独运行某个：go test -run TestMath/负数
+// 4. 输出更清晰：有层级关系
+```
+
+**面试题8：TestMain是做什么的？**
+```go
+func TestMain(m *testing.M) {
+    fmt.Println("=== SETUP ===")
+    // 初始化：建数据库、开文件、连服务器
+    
+    code := m.Run()  // 运行所有测试
+    
+    fmt.Println("=== TEARDOWN ===")
+    // 清理：删数据库、关文件
+    
+    os.Exit(code)
+}
+// TestMain在整个包测试前执行一次
+// m.Run()运行所有Test函数
+```
+
+**面试题9：httptest怎么测试HTTP服务？**
+```go
+func TestHandler(t *testing.T) {
+    ts := httptest.NewServer(http.HandlerFunc(
+        func(w http.ResponseWriter, r *http.Request) {
+            fmt.Fprintln(w, "ok")
+        },
+    ))
+    defer ts.Close()
+    
+    resp, err := http.Get(ts.URL + "/test")
+    if err != nil { t.Fatal(err) }
+    defer resp.Body.Close()
+    
+    body, _ := io.ReadAll(resp.Body)
+    if string(body) != "ok\n" {
+        t.Errorf("got %q, want %q", body, "ok\n")
+    }
+}
+```
+
+**面试题10：Fuzzing测试（Go 1.18+）是什么？**
+```go
+func FuzzReverse(f *testing.F) {
+    // 种子语料（初始输入）
+    f.Add("hello")
+    f.Add("世界")
+    
+    f.Fuzz(func(t *testing.T, s string) {
+        reversed := Reverse(s)
+        double := Reverse(reversed)
+        if s != double {
+            t.Errorf("反转两次不等于原串: %q", s)
+        }
+        if utf8.ValidString(s) && !utf8.ValidString(reversed) {
+            t.Errorf("产生了无效UTF-8: %q", reversed)
+        }
+    })
+}
+// 运行：go test -fuzz FuzzReverse
+// Fuzzing自动生成随机输入测试边界情况
+```
+
+---
+
 > **下一章**：[第12章 反射](./ch12-reflection.md) —— reflect.Type、reflect.Value、动态调用、结构体标签。

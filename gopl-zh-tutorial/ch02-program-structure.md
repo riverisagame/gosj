@@ -1883,4 +1883,183 @@ const 声明
 
 ---
 
+---
+
+### ⚡ 2.17 大厂面试题扩展（程序结构篇·10道）
+
+**面试题1：var和:=声明变量有什么区别？**
+```
+var：可以声明在任何地方（包级别+函数内）
+  :=：只能在函数内使用
+  var：可以不初始化（使用零值）
+  :=：必须初始化
+  var：可以显式指定类型
+  :=：只能类型推断
+
+包级别：只能用var
+函数内：优先用:=
+```
+
+**面试题2：什么是变量遮蔽（Variable Shadowing）？**
+```go
+var x = 10  // 包级变量
+
+func main() {
+    x := 20  // 遮蔽了包级x
+    fmt.Println(x)  // 20
+    
+    if true {
+        x := 30  // 遮蔽了函数级x
+        fmt.Println(x)  // 30（在if块里）
+    }
+    
+    fmt.Println(x)  // 20（函数级x，没被if影响）
+}
+```
+
+**面试题3：new(T)和&T{}有什么区别？**
+```go
+// new(T)：只能得到零值
+p1 := new(int)  // *int → 0
+p2 := new(Person)  // *Person → {Name:"", Age:0}
+
+// &T{}：可以指定字段值
+p3 := &Person{Name: "Alice"}  // Name="Alice", Age=0
+
+// 对于简单类型，Go 1.17+支持&T{}
+p4 := &int(42)  // *int → 42（Go 1.26+用new(int(42))）
+```
+
+**面试题4：Go有枚举类型吗？怎么实现枚举？**
+```go
+// Go没有专门的enum关键字
+// 用const + iota实现
+
+type Color int
+
+const (
+    Red Color = iota  // 0
+    Green             // 1
+    Blue              // 2
+)
+
+func (c Color) String() string {
+    return [...]string{"红色","绿色","蓝色"}[c]
+}
+
+fmt.Println(Red)  // 红色
+```
+
+**面试题5：iota在同一个const块里怎么重置？**
+```go
+// iota在每个const块里从0开始
+
+const (
+    A = iota  // 0
+    B        // 1
+    C        // 2
+)
+
+const (
+    D = iota  // 0（重新开始！）
+    E        // 1
+)
+
+// 实用的位运算枚举：
+const (
+    Read  = 1 << iota  // 1
+    Write              // 2
+    Exec               // 4
+    Admin              // 8
+)
+```
+
+**面试题6：包级变量的初始化顺序是什么样的？**
+```go
+var a = b + c  // 3. a=3（最后）
+var b = f()    // 2. b=2
+var c = 1      // 1. c=1（最先，因为没依赖）
+
+func f() int { return c + 1 }
+
+// 编译器按依赖图排序
+// c没有依赖 → 最先
+// b依赖c → 然后b
+// a依赖b → 最后a
+```
+
+**面试题7：init函数有什么用？可以有几个？**
+```go
+// init在main之前执行
+// 每个文件可以有多个init
+// 不能手动调用
+
+func init() { fmt.Print("A ") }
+func init() { fmt.Print("B ") }
+
+func main() { fmt.Println("main") }
+// 输出：A B main
+
+// init的使用场景：
+// 1. 注册插件/数据库驱动
+// 2. 初始化全局状态
+// 3. 解析配置文件
+```
+
+**面试题8：循环导入（import cycle）怎么解决？**
+```go
+// 错误：a → b → a（循环依赖）
+package a
+import "b"
+
+package b
+import "a"  // ❌ 编译错误！
+
+// 解决方案：
+// 1. 提取公共接口到第三个包c
+// 2. 把双向依赖改为单向
+// 3. 使用回调函数
+package a
+var OnEvent func()
+
+package b
+import "a"
+func init() {
+    a.OnEvent = func() { /* 处理 */ }
+}
+```
+
+**面试题9：Go中哪些类型可以做map的key？**
+```
+可以（可用==比较）：
+  bool, 整数, 浮点数, string, 指针, channel
+  只包含可比较字段的结构体
+  只包含可比较元素的数组
+
+不可以：
+  slice ❌
+  map ❌
+  function ❌
+  （因为不能使用 == 比较）
+```
+
+**面试题10：逃逸分析是什么？怎么查看？**
+```
+逃逸分析 = 编译器决定变量放栈还是堆
+
+查看逃逸：
+  go build -gcflags='-m' main.go
+
+什么情况会逃逸到堆：
+  1. 返回局部变量指针：return &x
+  2. 闭包捕获外部变量：func() { x++ }
+  3. 变量太大：> 64KB
+  4. 赋给interface{}：fmt.Println(x)
+
+逃逸到堆的代价：
+  需要GC回收，性能比栈低
+```
+
+---
+
 > **下一章**：[第3章 基础数据类型](./ch03-basic-types.md) —— 深入Go的整型、浮点数、复数、布尔、字符串和常量系统。

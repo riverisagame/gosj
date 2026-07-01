@@ -1550,4 +1550,192 @@ Go运行时会检测到死锁：
 
 ---
 
+---
+
+### ⚡ 9.12 大厂面试题扩展（共享并发篇·10道）
+
+**面试题1：Mutex和RWMutex有什么区别？**
+```
+Mutex（互斥锁）：
+  Lock：只有一个goroutine能拿到
+  Unlock：释放锁
+  适合：读写差不多的场景
+
+RWMutex（读写锁）：
+  RLock：多个goroutine可以同时读
+  Lock：写的时候只能一个人
+  适合：读远多于写的场景
+
+选择：
+  读1万次/写1次 → RWMutex
+  读1次/写1次 → Mutex（RWMutex有额外开销）
+```
+
+**面试题2：什么是自旋锁？Go的Mutex是自旋锁吗？**
+```
+自旋锁：反复检查锁是否释放（CPU空转）
+  适合：锁等待时间极短
+
+Go的Mutex不是纯自旋锁
+  先尝试自旋几次
+  如果不行 → goroutine挂起（不浪费CPU）
+  这样结合了自旋和阻塞的优点
+```
+
+**面试题3：Go的Mutex是可重入的吗？**
+```go
+var mu sync.Mutex
+
+func f() {
+    mu.Lock()
+    g()      // g也Lock → 死锁！
+    mu.Unlock()
+}
+
+func g() {
+    mu.Lock()  // ❌ 同一个goroutine再锁一次
+    mu.Unlock()
+}
+// Go的Mutex不是可重入的！
+// 防止你在同一个goroutine里重复加锁
+```
+
+**面试题4：什么是数据竞争？怎么检测？**
+```go
+var count int
+
+// 两个goroutine同时写count → 数据竞争
+go func() { count++ }()
+go func() { count++ }()
+
+// 检测：go run -race main.go
+// 输出：WARNING: DATA RACE
+
+// 修复：加锁
+var mu sync.Mutex
+go func() { mu.Lock(); count++; mu.Unlock() }()
+```
+
+**面试题5：sync.Once是怎么保证只执行一次的？**
+```go
+var once sync.Once
+var config *Config
+
+func GetConfig() *Config {
+    once.Do(func() {
+        config = loadConfig()  // 只执行一次
+    })
+    return config
+}
+
+// 原理：双重检查锁定
+// 1. 先原子读once.done（不加锁）
+// 2. 如果为0（没执行过），加锁
+// 3. 再检查一次done是否为0
+// 4. 还是0 → 执行函数，设done=1
+// 5. 解锁
+// 后续调用：直接检查done=1 → 不执行
+```
+
+**面试题6：atomic.Value和sync.RWMutex哪个快？**
+```go
+// atomic.Value：无锁读取
+var config atomic.Value
+config.Store(&Config{Addr: ":8080"})
+cfg := config.Load().(*Config)  // ~5ns
+
+// RWMutex：有锁读取
+var mu sync.RWMutex
+var cfg *Config
+mu.RLock()
+c := cfg  // ~15ns
+mu.RUnlock()
+
+// atomic.Value适合：配置热更新
+// RWMutex适合：需要同时保护多个变量
+```
+
+**面试题7：map的并发读写为什么会panic？**
+```go
+m := make(map[int]int)
+
+// 两个goroutine同时读写
+// 即使一个读一个写也会panic！
+go func() {
+    for { _ = m[1] }  // 读
+}()
+go func() {
+    for { m[2] = 2 }  // 写
+}()
+// fatal error: concurrent map read and map write
+
+// 修复方案：
+// 1. map + sync.RWMutex
+// 2. sync.Map（读多写少场景）
+// 3. 改为channel通信
+```
+
+**面试题8：sync.Map适合什么场景？**
+```
+适合：
+  读远多于写
+  多个goroutine读不同的key
+  key相对稳定（很少增删）
+  如：配置表、缓存
+
+不适合：
+  写很多
+  key频繁变化
+  存大量数据（有内存开销）
+```
+
+**面试题9：什么是ABA问题？CAS操作有什么坑？**
+```go
+// CAS：Compare And Swap
+// 比较旧值，如果没变就更新
+
+// ABA问题：
+// 1. goroutine A读x = 1
+// 2. goroutine B把x改成2
+// 3. goroutine C把x改回1
+// 4. goroutine A: CAS(x, 1, 3) 成功
+//   但x已经不是原来的x了（中间变过）
+
+// Go中CAS的使用：
+swapped := atomic.CompareAndSwapInt64(&x, old, new)
+// 返回是否成功
+```
+
+**面试题10：如何写一个并发安全的生产者-消费者？**
+```go
+func main() {
+    ch := make(chan int, 10)
+    done := make(chan bool)
+    
+    // 生产者
+    go func() {
+        for i := 0; i < 20; i++ {
+            ch <- i
+            fmt.Println("生产:", i)
+        }
+        close(ch)
+    }()
+    
+    // 消费者
+    go func() {
+        for v := range ch {
+            fmt.Println("消费:", v)
+            time.Sleep(100 * time.Millisecond)
+        }
+        done <- true
+    }()
+    
+    <-done
+}
+// 用channel实现生产者-消费者
+// 天然并发安全！不需要锁
+```
+
+---
+
 > **下一章**：[第10章 包和工具](./ch10-packages-tools.md) —— 包的组织、导入路径、初始化、go工具链。

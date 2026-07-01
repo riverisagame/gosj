@@ -1180,4 +1180,200 @@ Windows设置：
 
 ---
 
+---
+
+### ⚡ 10.13 大厂面试题扩展（包工具篇·15道）
+
+**面试题1：GOPATH和Go Modules有什么区别？**
+```
+GOPATH（Go 1.11之前）：
+  所有代码必须在 $GOPATH/src 下
+  没有版本管理
+  不能同时用同一个包的不同版本
+
+Go Modules（Go 1.11+，1.16默认）：
+  代码可以在任何位置
+  go.mod管理版本
+  不同项目可以用不同版本
+  go.sum保证安全
+```
+
+**面试题2：go.mod里的 `go 1.26` 是什么意思？**
+```go
+module myapp
+go 1.26
+
+// 不是"必须用Go 1.26编译"
+// 是"使用Go 1.26的语言特性"
+// 
+// 比如 go 1.22 → 开启循环变量修复
+// 比如 go 1.21 → 旧循环行为
+```
+
+**面试题3：go.sum 是做什么的？可以删除吗？**
+```
+go.sum = 依赖的"防伪码"
+存了每个依赖包的哈希值
+
+不要手动删除！
+如果删了：go mod tidy会重新生成
+
+但注意：go.sum不是锁文件（不像package-lock.json）
+它只是验证完整性
+```
+
+**面试题4：vendor目录是做什么的？什么时候用？**
+```
+vendor = 把依赖的源码复制到项目本地
+
+场景1：内网开发（没有外网权限）
+场景2：CI/CD加速（不用每次下载）
+场景3：精确控制依赖版本
+
+创建：go mod vendor
+使用：go build -mod=vendor
+```
+
+**面试题5：Go的交叉编译为什么这么方便？**
+```
+命令：GOOS=linux GOARCH=arm64 go build
+
+为什么方便？
+  1. Go运行时用Go实现（不是C）
+  2. 编译器生成目标平台代码
+  3. 静态编译（不需要目标平台的C库）
+
+对比：
+  Go: GOOS=linux GOARCH=arm64 go build
+  C++: 需要交叉编译工具链（ARM gcc）
+```
+
+**面试题6：Go编译后的文件为什么比C的大？**
+```
+Go静态编译：所有依赖和运行时都打包进去了
+  一个Hello World：约1.5MB
+  包含：运行时、GC、调度器、所有标准库
+
+C动态链接：依赖系统的dll
+  一个Hello World：约16KB
+  但换了系统可能跑不了
+
+Go的好处：一个exe到处跑（不用装Go环境）
+```
+
+**面试题7：go build -v 和 go build -x 有什么区别？**
+```
+-v（verbose）：显示正在编译的包名
+  输出：github.com/user/project/utils
+
+-x（trace）：显示每条编译命令
+  输出：/usr/local/go/bin/compile -o ...
+  
+  -x显示底层命令，用于调试编译问题
+  -v只是看进度
+```
+
+**面试题8：怎么清理Go的编译缓存？**
+```bash
+go clean -cache        # 清理编译缓存
+  go clean -testcache    # 清理测试缓存
+  go clean -modcache     # 清理模块缓存（会重新下载）
+  go clean -i ./...      # 清理安装的二进制
+```
+
+**面试题9：go get 和 go install 有什么区别？**
+```bash
+# Go 1.18之前：
+go get = 下载依赖 + 编译安装
+
+# Go 1.18之后：
+go get  = 只修改go.mod（下载依赖）
+go install = 下载 + 编译安装到$GOBIN
+
+# 安装命令行工具：
+go install golang.org/x/tools/cmd/goimports@latest
+```
+
+**面试题10：replace指令有什么用？**
+```go
+// 在go.mod中使用replace
+// 把某个依赖替换成别的版本或本地路径
+
+// 场景1：本地调试
+replace github.com/my/package => ../local/package
+
+// 场景2：修复bug但还没合并到上游
+replace github.com/buggy/package => github.com/fixed/package v1.0.1
+
+// 场景3：解决依赖冲突
+replace golang.org/x/net v1.0.0 => golang.org/x/net v1.2.3
+```
+
+**面试题11：go work 是做什么的？**
+```bash
+# go.work（Go 1.18+）用于多模块开发
+
+# 场景：server/ 依赖 mylib/
+# 不发布mylib的情况下直接用
+
+cd ~/projects/
+go work init ./server ./mylib
+# 生成 go.work 文件
+
+# 之后 server 直接用本地的 mylib
+# 修改mylib → 立即生效，不用publish
+```
+
+**面试题12：GOPROXY 是做什么的？为什么国内要用 goproxy.cn？**
+```
+GOPROXY = Go模块代理
+
+官方代理：proxy.golang.org（在国外，可能慢）
+国内代理：goproxy.cn（快）
+
+设置：
+  go env -w GOPROXY=https://goproxy.cn,direct
+
+direct = 如果代理找不到，去原始地址
+```
+
+**面试题13：GOOS和GOARCH有哪些常用的组合？**
+```
+GOOS=linux   GOARCH=amd64    # Linux x86_64（最常用）
+  GOOS=linux   GOARCH=arm64    # 树莓派/ARM服务器
+  GOOS=windows GOARCH=amd64    # Windows
+  GOOS=darwin  GOARCH=arm64    # Mac M1/M2
+  GOOS=darwin  GOARCH=amd64    # Mac Intel
+  GOOS=js      GOARCH=wasm     # 浏览器WebAssembly
+```
+
+**面试题14：Go 1.21+的toolchain指令是什么？**
+```go
+// go.mod 中的 toolchain 指令
+module myapp
+go 1.26
+toolchain go1.26.4  // 必须用这个版本编译
+
+// 如果当前Go版本不是1.26.4
+// go 命令会自动下载正确的版本
+// 保证CI/CD环境一致
+```
+
+**面试题15：怎么查看go的环境变量？**
+```bash
+go env          # 所有环境变量
+  go env GOPATH  # 单个变量
+  go env -w GOFLAGS=-mod=vendor  # 设置环境变量（保存到配置）
+  
+# 常用环境变量：
+  GOROOT     Go安装目录
+  GOPATH     工作区目录
+  GOMODCACHE 模块缓存位置
+  GOCACHE    编译缓存位置
+  GOPROXY    模块代理
+  GONOSUMCHECK 不检查哈希的模块
+```
+
+---
+
 > **下一章**：[第11章 测试](./ch11-testing.md) —— go test、测试函数、覆盖率、基准测试和示例函数。

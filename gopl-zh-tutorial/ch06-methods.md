@@ -1313,4 +1313,251 @@ uint64 = 64个bit = 可以标记64个数字
 
 ---
 
+---
+
+### ⚡ 6.13 大厂面试题扩展（方法篇·15道）
+
+**面试题1：下面代码输出什么？**
+```go
+type Slice []int
+
+func (s Slice) Append(v int) {
+    s = append(s, v)  // 修改的是副本
+}
+
+func main() {
+    s := Slice{1, 2}
+    s.Append(3)
+    fmt.Println(s) // [1 2] 还是 [1 2 3]？
+}
+// 输出：[1 2] 不是[1 2 3]!
+// 因为值接收器s是副本，append修改的是副本
+// 修复：用指针接收器 func (s *Slice) Append(v int)
+```
+
+**面试题2：什么时候用指针接收器？什么时候用值接收器？**
+```
+指针接收器（优先用）：
+  需要修改接收器 → 必须用指针
+  接收器是大结构体 → 避免拷贝开销
+  接收器有sync.Mutex → 不能复制
+  不确定时 → 用指针（安全）
+
+值接收器：
+  接收器是int/string/bool等小类型
+  接收器不应该被修改（不可变语义）
+  你的类型需要同时满足接口（值类型的方法集包含值方法）
+```
+
+**面试题3：String()方法有什么用？必须定义在值接收器上吗？**
+```go
+type Age int
+func (a Age) String() string { return fmt.Sprintf("%d岁", a) }
+
+// 也可以用指针接收器
+func (a *Age) String() string {
+    if a == nil { return "未知" }
+    return fmt.Sprintf("%d岁", int(*a))
+}
+
+// fmt.Println会自动调用String()
+var a Age = 18
+fmt.Println(a)  // 18岁
+```
+
+**面试题4：结构体嵌入和继承有什么区别？**
+```
+嵌入（Go的方式）：
+  type Dog struct { Animal }  // Dog「有一个」Animal
+  方法提升（promotion），不是继承
+  Dog不能赋值给Animal（类型不同）
+  → 组合优于继承
+
+继承（Java/C++的方式）：
+  class Dog extends Animal  // Dog「是一个」Animal
+  Dog可以当Animal用（多态）
+  → 脆弱，容易出问题
+```
+
+**面试题5：nil接收器调用方法会panic吗？**
+```go
+type Node struct {
+    Value int
+    Next  *Node
+}
+
+func (n *Node) Print() {
+    if n == nil {
+        fmt.Println("nil节点")
+        return
+    }
+    fmt.Println(n.Value)
+}
+
+func main() {
+    var n *Node  // nil
+    n.Print()    // ✅ 不会panic！输出"nil节点"
+}
+// 记住：Go允许nil接收器调用方法
+// 方法内部需要自己检查是否为nil
+```
+
+**面试题6：下面代码能编译通过吗？**
+```go
+type MyInt int
+
+func (m MyInt) Double() MyInt {
+    return m * 2
+}
+
+func main() {
+    var x int = 10
+    // x.Double()    ← ❌ int没有Double方法
+    var y MyInt = 10
+    fmt.Println(y.Double())  // ✅ MyInt有Double方法
+}
+```
+
+**面试题7：同一个类型可以有同名方法吗？**
+```go
+type T struct{}
+func (t T) F() {}
+// func (t T) F(a int) {}  ← ❌ 不能重载！
+// func (t *T) F() {}     ← ❌ 也不能！同名方法不行
+// Go不支持方法重载！
+```
+
+**面试题8：方法和函数的区别是什么？**
+```
+函数：独立的代码块，不属于任何类型
+   func Add(a, b int) int { return a + b }
+方法：绑定到特定类型的函数
+   func (t T) Add(b int) int { return t.a + b }
+
+区别：
+  方法有接收器（receiver）
+  方法可以实现接口
+  方法支持嵌入提升
+```
+
+**面试题9：方法表达式和方法值有什么区别？**
+```go
+type Point struct{ X, Y float64 }
+func (p Point) Add(q Point) Point {
+    return Point{p.X+q.X, p.Y+q.Y}
+}
+
+p := Point{1, 2}
+
+// 方法值：绑定接收器
+f := p.Add  // func(Point) Point
+f(Point{3,4})  // {4,6}
+
+// 方法表达式：不绑定接收器
+g := Point.Add  // func(Point, Point) Point
+g(p, Point{3,4})  // {4,6}
+```
+
+**面试题10：Bit数组比起map[int]bool有什么优势？**
+```
+Bit数组：
+  1个bit存一个数字（0~63存在一个uint64里）
+  内存：存100万个数字 → 约125KB
+  速度：位运算（O(1)）
+
+map[int]bool：
+  每个key存int(8字节)+value(1字节)+哈希开销
+  内存：存100万个数字 → 约50MB（400倍！）
+  速度：哈希查找（O(1)但常数大）
+
+劣势：只能存非负整数，且范围有限
+```
+
+**面试题11：Go的封装和Java的private有什么区别？**
+```
+Go：包级别可见性
+  大写=导出（所有包可见）
+  小写=未导出（同包可见）
+  不需要private/protected/public关键字
+
+Java：类级别可见性
+  private   → 只有本类可见
+  protected → 子类+同包可见
+  public    → 全部可见
+
+Go更简单：只有两种可见性
+  package main
+  var x int        ← 本包可见
+  var X int        ← 所有包可见
+```
+
+**面试题12：嵌入结构体的方法冲突怎么解决？**
+```go
+type A struct{}
+func (a A) F() string { return "A" }
+
+type B struct{}
+func (b B) F() string { return "B" }
+
+type C struct{ A; B }
+
+func main() {
+    c := C{}
+    // fmt.Println(c.F())  ← ❌ ambiguous selector!
+    fmt.Println(c.A.F())  // A
+    fmt.Println(c.B.F())  // B
+}
+// 解决：显式指定调用哪个嵌入类型的方法
+```
+
+**面试题13：怎么给其他包的类型添加方法？**
+```go
+// ❌ 不行：不能给别人的类型直接加方法
+// func (s *http.Server) LogStatus() {}  // ❌
+
+// ✅ 方案1：定义新类型（包装）
+type MyServer http.Server
+func (s *MyServer) LogStatus() {}
+
+// ✅ 方案2：定义别名后加方法
+type MyInt = int  // 别名——不行！
+type MyInt int    // 新类型——可以！
+func (m MyInt) Double() MyInt { return m * 2 }
+```
+
+**面试题14：结构体值接收器的方法能修改原值吗？**
+```go
+type Person struct{ Name string }
+
+func (p Person) SetName(name string) {
+    p.Name = name  // 修改的是副本
+}
+
+func main() {
+    p := Person{"小明"}
+    p.SetName("小红")
+    fmt.Println(p.Name)  // "小明"（没变！）
+}
+// 修复：用指针接收器
+```
+
+**面试题15：下面代码输出顺序是什么？**
+```go
+type T struct{ val int }
+func (t T) Print() { fmt.Println("T:", t.val) }
+func (t *T) PrintP() { fmt.Println("*T:", t.val) }
+
+func main() {
+    t := T{1}
+    p := &T{2}
+    t.Print()    // T:1
+    p.Print()    // T:2（自动解引用）
+    t.PrintP()   // *T:1（自动取地址）
+    p.PrintP()   // *T:2
+}
+// 自动解引用和取地址是Go的语法糖
+```
+
+---
+
 > **下一章**：[第7章 接口](./ch07-interfaces.md) —— 接口是合约、接口类型、接口值、类型断言、类型分支等。

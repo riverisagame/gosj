@@ -3434,4 +3434,193 @@ cfg := Config{
 
 ---
 
+---
+
+### ⚡ 1.12 大厂面试题扩展（入门篇·10道）
+
+**面试题1：Go为什么是编译型语言不是解释型语言？**
+```
+编译型：源代码→机器码→直接执行
+  优点：运行快、不需要装运行时（一个exe到处跑）
+  缺点：编译需要时间
+  代表：Go、C、Rust
+
+解释型：源代码→解释器逐行执行
+  优点：不需要编译，改完就能跑
+  缺点：运行慢、需要装解释器
+  代表：Python、JavaScript
+
+Go选择编译型：为了性能
+  编译出单个二进制文件，部署方便
+```
+
+**面试题2：main函数可以带参数吗？**
+```go
+func main()  // 无参数无返回值
+
+// 不能自己加参数
+func main(args []string)  // ❌ 编译错误
+
+// 通过os.Args获取命令行参数
+func main() {
+    fmt.Println(os.Args)  // 第一个是程序名
+}
+```
+
+**面试题3：fmt.Println和fmt.Printf有什么区别？**
+```go
+fmt.Println("hello", 42)  // 自动空格间隔，自动换行
+  // hello 42
+
+  fmt.Printf("%s %d\n", "hello", 42)  // 格式化输出
+  // hello 42
+
+// Println：简单打印，加空格+换行
+// Printf：控制格式，%s字符串 %d整数 %f浮点数 %v任意值
+```
+
+**面试题4：Go有没有while循环？**
+```go
+// Go只有for关键字
+// 但for可以代替while
+
+for {
+    // 无限循环（等价于while true）
+}
+
+for i < 10 {
+    // 条件循环（等价于while i < 10）
+    i++
+}
+
+for i := 0; i < 10; i++ {
+    // 标准for
+}
+```
+
+**面试题5：break可以跳出多层循环吗？**
+```go
+outer:
+for i := 0; i < 5; i++ {
+    for j := 0; j < 5; j++ {
+        if i*j > 6 {
+            break outer  // 跳出两层循环！
+        }
+    }
+}
+// 没有标签的话，break只跳出一层
+```
+
+**面试题6：Go的switch有什么特别之处？**
+```go
+// 1. 自动break（不用手动写）
+switch n {
+case 1:
+    fmt.Println("一")
+    // 不会执行下面的case！
+case 2:
+    fmt.Println("二")
+}
+
+// 2. case可以是表达式
+switch {
+case score >= 90:
+    fmt.Println("优秀")
+case score >= 60:
+    fmt.Println("及格")
+}
+
+// 3. fallthrough穿透
+switch n {
+case 1:
+    fmt.Println("一")
+    fallthrough  // 强制执行下一个case
+case 2:
+    fmt.Println("二")  // 也会执行
+}
+```
+
+**面试题7：defer在什么情况下使用？**
+```go
+// defer = 延迟执行，函数返回前执行
+
+// 常见用途：
+// 1. 关闭文件
+f, _ := os.Open("file.txt")
+defer f.Close()
+
+// 2. 解锁
+mu.Lock()
+defer mu.Unlock()
+
+// 3. 记录函数执行时间
+defer func() {
+    fmt.Println("耗时:", time.Since(start))
+}()
+
+// 4. 捕获panic
+defer func() {
+    if r := recover(); r != nil {
+        fmt.Println("恢复:", r)
+    }
+}()
+```
+
+**面试题8：make和new有什么区别？**
+```
+new(T)：
+  返回*T（指针）
+  分配零值内存
+  适用于任何类型
+  new(int) = *int = 0
+
+make(T, args)：
+  返回T（不是指针）
+  初始化内部数据结构
+  只用于slice/map/channel
+  make([]int, 5) = []int{0,0,0,0,0}
+```
+
+**面试题9：Go的变量声明有哪些方式？**
+```go
+// 方式1：完整声明
+var name string = "Alice"
+
+// 方式2：类型推断
+var name = "Alice"
+
+// 方式3：短声明（只能在函数内）
+name := "Alice"
+
+// 方式4：分组声明
+var (
+    name = "Alice"
+    age  = 18
+)
+
+// 方式5：多变量同时声明
+var a, b, c int
+x, y, z := 1, 2, 3
+```
+
+**面试题10：为什么Go的右大括号不能换行？**
+```go
+// ✅ 正确
+func main() {
+    fmt.Println("Hello")
+}
+
+// ❌ 错误
+func main()
+{               // 编译错误！
+    fmt.Println("Hello")
+}
+
+// 原因：Go自动插入分号
+// 函数声明行末：func main() → 插入; → {变成下一行开始
+// 单独一个{ → 编译错误
+```
+
+---
+
 > **下一章**：[第2章 程序结构](./ch02-program-structure.md) —— 深入了解Go程序的构成：命名、声明、变量、类型、包和作用域。

@@ -1757,3 +1757,32 @@ m := reflect.MakeMap(reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(0)))
 **Q: CanSet=false？** A: 传了值没传指针。传&x再Elem()才能Set。
 
 **Q: struct tag怎么解析？** A: 字符串解析。Tag.Get("json")找key为json的value。
+
+
+### 🧠 12.17 纳米级概念：运行时类型和类型元数据
+
+#### 运行时类型——程序在运行时怎么知道变量的类型
+
+
+
+#### 类型元数据的结构
+
+{ is a shell keyword
+
+#### Type vs Kind
+
+
+
+
+### 🧠 12.17 运行时类型和类型元数据
+
+运行时每个类型有一个_type结构体:
+  size, kind, name, equal函数指针
+reflect.TypeOf拿到就是这个结构体的指针
+
+Type vs Kind:
+  type MyInt int
+  t := reflect.TypeOf(MyInt(42))
+  t.Name() = "MyInt"(你取的名字)
+  t.Kind() = "int"(底层种类)
+

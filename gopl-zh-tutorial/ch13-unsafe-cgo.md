@@ -1504,3 +1504,35 @@ go run -race main.go
 **Q: Go GC暂停多久？** A: 约20-130微秒。比眨眼快1000倍。
 
 **Q: cgo为哈慢？** A: 保存Go寄存器/切C栈/锁M。约100ns(纯Go 2ns)。Go 1.26优化到70ns。
+
+
+### 🧠 13.15 纳米级概念：指针安全和内存操作
+
+#### Go为什么比C安全
+
+
+
+#### unsafe.Pointer怎么绕过
+
+
+
+#### 内存分配三级结构
+
+
+
+
+### 🧠 13.15 Go为什么比C安全
+
+C: int* p = 100; *p = 42 随便写地址 危险
+Go: var p *int = &x 只能指合法变量 安全
+C = 万能钥匙(危) Go = 自己房门钥匙(安)
+
+零拷贝字符串转[]byte:
+  unsafe.Slice(unsafe.StringData(s), len(s))
+  比[]byte(s)快几百倍 但返回的不能修改！
+
+内存分配三级:
+  <32KB: mcache(无锁)→mcentral→mheap
+  >=32KB: mheap直接分配
+  = 手边抽屉→部门工具间→公司仓库
+

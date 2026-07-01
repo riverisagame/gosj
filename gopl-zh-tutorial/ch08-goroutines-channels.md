@@ -2621,3 +2621,13 @@ for n := range sq(sq(gen(2, 3))) {
 ---
 
 > **下一章**：[第9章 基于共享变量的并发](./ch09-shared-vars-concurrency.md) —— 竞争条件、Mutex、RWMutex、内存同步、sync.Once和竞争检测。
+
+### 🎤 Q&A 并发篇
+
+**Q: goroutine最小栈？** A: 2KB。不够自动扩容(stack copying)。线程1MB固定。
+
+**Q: 无缓冲vs有缓冲channel？** A: 无缓冲=同步(双方必须同时)；有缓冲=异步(满了才等)。
+
+**Q: channel关闭后读写？** A: 读→零值+ok=false；写→panic。关已关的→panic。
+
+**Q: select多个case同时就绪？** A: 随机选一个！Go洗牌后检查，防止饿死。

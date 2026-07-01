@@ -1747,3 +1747,13 @@ m := reflect.MakeMap(reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(0)))
 ---
 
 > **下一章**：[第13章 底层编程](./ch13-unsafe-cgo.md) —— unsafe包、cgo调用C代码等高级话题。
+
+### 🎤 Q&A 反射篇
+
+**Q: 何时必须用反射？** A: JSON序列化/ORM/DI/协议编解码。普通逻辑别用。
+
+**Q: 反射为啥慢？** A: 方法名查找+参数打包+类型检查+堆分配。比直接调慢250倍。
+
+**Q: CanSet=false？** A: 传了值没传指针。传&x再Elem()才能Set。
+
+**Q: struct tag怎么解析？** A: 字符串解析。Tag.Get("json")找key为json的value。

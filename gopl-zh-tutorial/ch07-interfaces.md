@@ -1910,3 +1910,13 @@ DefaultServeMux局限：
 ---
 
 > **下一章**：[第8章 Goroutines和Channels](./ch08-goroutines-channels.md) —— Go并发的核心机制。
+
+### 🎤 Q&A 接口篇
+
+**Q: 隐式实现好处？** A: 不需implements。别人包的类型自动满足你的接口，解耦灵活。
+
+**Q: nil接口vs存nil指针的接口？** A: 接口=type+data。存nil指针时type不是nil，所以接口!=nil。
+
+**Q: 空接口interface{}用途？** A: 存任何类型。fmt.Println参数、JSON解析未知字段。
+
+**Q: 类型断言失败？** A: 不用ok模式→panic；用ok模式→ok=false返回零值。

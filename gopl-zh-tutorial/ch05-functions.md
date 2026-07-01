@@ -2324,3 +2324,16 @@ Go不用动态链接的原因：
 ---
 
 > **下一章**：[第6章 方法](./ch06-methods.md) —— 方法声明、指针接收器、嵌入扩展、封装。
+
+
+### 🎤 Q&A 函数篇
+
+**Q: defer执行顺序？** A: LIFO后进先出。参数声明时求值。能改命名返回值(不能改匿名)。
+
+**Q: panic后发生什么？** A: 当前函数停→执行defer→向上抛→每层defer→到main或recover。
+
+**Q: recover只能在defer中用？** A: 对！panic上抛时只执行defer，recover在defer外返回nil。
+
+**Q: 闭包捕获值还是引用？** A: 引用(变量地址)。所有闭包共享同个变量。捕获当前值要传参或i:=i。
+
+**Q: errors.Is vs errors.As？** A: Is检查值等不等，As检查类型匹不配。都递归错误链。

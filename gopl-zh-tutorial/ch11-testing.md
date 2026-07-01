@@ -1892,3 +1892,13 @@ synctest.Run(func() {
 ---
 
 > **下一章**：[第12章 反射](./ch12-reflection.md) —— reflect.Type、reflect.Value、动态调用、结构体标签。
+
+### 🎤 Q&A 测试篇
+
+**Q: t.Error vs t.Fatal？** A: Error只记录不停止；Fatal记录+runtime.Goexit()停止当前测试。
+
+**Q: 测试缓存怎么跳过？** A: go test -count=1。缓存基于源码哈希，外部变时Go不知。
+
+**Q: 覆盖率100%就没bug？** A: 不是！覆盖率只测哪些代码跑了，不测逻辑对不对。断言才是关键。
+
+**Q: 子测试好处？** A: 独立运行/单独跑(go test -run)/清晰层级/支持t.Parallel()。

@@ -1971,3 +1971,13 @@ happens-before保证：
 ---
 
 > **下一章**：[第10章 包和工具](./ch10-packages-tools.md) —— 包的组织、导入路径、初始化、go工具链。
+
+### 🎤 Q&A 共享并发篇
+
+**Q: Mutex vs RWMutex？** A: Mutex互斥。RWMutex读共享写互斥。读远多写时用RWMutex。
+
+**Q: atomic vs Mutex哪个快？** A: atomic快约4倍(5ns vs 20ns)。简单计数用atomic，复杂用Mutex。
+
+**Q: 死锁4条件？** A: 互斥、持有等待、不可剥夺、循环等待。破坏任一就能解。
+
+**Q: sync.Once保证只执行一次？** A: 双重检查锁定。原子读→加锁→再检→执行→设done=1。

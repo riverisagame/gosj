@@ -1908,6 +1908,18 @@ Go 1.18之后的扩容策略：
   1000→1280→1640→2100 浪费少很多
 ```
 
+### 🎤 Q&A
+
+Q:nil和空切片？A:var s[]int=nil(json null)；s:=[]int{}(json [])。nil可append。
+
+Q:slice扩容？A:cap<256翻倍，≥256×1.25。
+
+Q:map遍历随机？A:Go故意，fastrand随机起始桶。
+
+Q:map key类型？A:可==的(type)能当key。slice/map/func不行。
+
+Q:结构体省内存？A:大字段放前面减少padding。
+
 ---
 
 > **下一章**：[第5章 函数](./ch05-functions.md) —— 函数声明、递归、多返回值、错误处理、defer、panic/recover。

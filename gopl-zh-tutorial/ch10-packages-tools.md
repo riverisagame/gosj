@@ -1604,3 +1604,13 @@ init执行顺序：
 ---
 
 > **下一章**：[第11章 测试](./ch11-testing.md) —— go test、测试函数、覆盖率、基准测试和示例函数。
+
+### 🎤 Q&A 包工具篇
+
+**Q: GOPATH vs Modules？** A: GOPATH必须放src下没版本管理。Modules有go.mod可多版本共存。
+
+**Q: go.sum有啥？** A: 依赖包的哈希值(防篡改)。别手动删，go mod tidy重生成。
+
+**Q: go mod tidy干啥？** A: 扫import→加缺的删没用的→更新go.mod/go.sum。
+
+**Q: 交叉编译？** A: GOOS=linux GOARCH=arm64 go build。cgo代码不行，要C交叉编译器。

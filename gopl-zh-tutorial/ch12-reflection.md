@@ -1471,3 +1471,184 @@ reflect.DeepEqual(a, b) → bool
 ---
 
 > **下一章**：[第13章 底层编程](./ch13-unsafe-cgo.md) —— unsafe包、cgo调用C代码等高级话题。
+
+---
+
+### 🔬 12.15 底层原理：反射的运行时实现
+
+#### 类型元数据——Go运行时怎么知道一个类型的全部信息
+
+```go
+var x int = 42
+t := reflect.TypeOf(x)
+
+// 通过反射可以知道：
+fmt.Println(t.Name())   // int
+fmt.Println(t.Size())   // 8
+fmt.Println(t.Align())  // 8
+fmt.Println(t.Kind())   // int
+
+这些信息存在哪里？
+存在 runtime._type 结构体里！
+
+_type 结构体（Go运行时的类型元数据）：
+┌──────────────────────────────────────────┐
+│ _type {                                   │
+│   size       uintptr  ← 类型大小（8字节）  │
+│   ptrdata    uintptr  ← 含指针的数据大小  │
+│   hash       uint32   ← 类型哈希（快速比较）│
+│   tflag      tflag    ← 类型标记           │
+│   align      uint8    ← 对齐值            │
+│   fieldAlign uint8    ← 字段对齐          │
+│   kind       uint8    ← 种类（int/string）│
+│   equal      func()   ← 比较函数          │
+│   gcdata     *byte    ← GC信息            │
+│   str        nameOff  ← 类型名字符串      │
+│   ptrToThis  typeOff  ← *T类型元数据      │
+│ }                                        │
+└──────────────────────────────────────────┘
+
+每种类型都有一个_type结构体
+int有一个，string有一个，你定义的Person也有一个
+编译时生成，运行时只读
+```
+
+#### reflect.Type的内部实现
+
+```
+reflect.Type 是一个接口：
+  type Type interface {
+      Align() int
+      Field(i int) StructField
+      Kind() Kind
+      Name() string
+      NumField() int
+      Size() uintptr
+      String() string
+      ...（十几个方法）
+  }
+
+它的底层实现是 reflect.rtype：
+  type rtype struct {
+      size       uintptr
+      ptrdata    uintptr
+      hash       uint32
+      tflag      tflag
+      align      uint8
+      fieldAlign uint8
+      kind       uint8
+      ...  // 和runtime._type一样
+  }
+
+rtype实现了Type接口的所有方法
+所以 reflect.TypeOf() 返回的Type接口
+底层实际是一个*rtype指针
+
+reflect.TypeOf(42) 的内部步骤：
+  1. 42被装箱为interface{}
+  2. 从interface{}中取出_type指针
+  3. 包装成reflect.Type返回
+```
+
+#### 方法表——反射怎么知道一个类型有哪些方法？
+
+```
+每个类型的方法信息存在"方法表"（Method Table）里
+
+假设：
+type MyType struct{}
+func (m MyType) M1() {}
+func (m MyType) M2() {}
+
+编译时生成方法表：
+┌──────────────────────────────────────────┐
+│ []method {                                │
+│   {                                       │
+│     name: "M1"                            │
+│     mtyp: func(Main.MyType)               │
+│     ifn:  func(Main.MyType) ← 值接收器版本  │
+│     tfn:  func(*Main.MyType) ← 指针版本    │
+│   },                                      │
+│   {                                       │
+│     name: "M2"                            │
+│     mtyp: func(Main.MyType)               │
+│     ifn:  func(Main.MyType)               │
+│     tfn:  func(*Main.MyType)              │
+│   },                                      │
+│ }                                         │
+└──────────────────────────────────────────┘
+
+t := reflect.TypeOf(MyType{})
+t.NumMethod()  → 返回2
+t.Method(0)    → 返回M1的信息
+```
+
+#### 动态调用——reflect.Call的完整过程
+
+```
+method := v.MethodByName("Add")
+result := method.Call([]reflect.Value{
+    reflect.ValueOf(1),
+    reflect.ValueOf(2),
+})
+
+method.Call 的内部步骤：
+
+1. 从方法表找到Add的地址
+2. 创建参数数组（在堆上）
+3. 把[]reflect.Value转换成[]interface{}
+4. 从interface{}拆箱取出具体值
+5. 调用函数（用地址直接跳转）
+6. 把返回值包装成[]reflect.Value
+7. 返回
+
+每一步都有类型检查和内存分配
+所以比直接调用慢250倍！
+
+直接调用：~2ns
+  main.Add(1, 2)  // 编译时就知道调哪个
+
+反射调用：~500ns
+  method.Call(args)  // 运行时才查方法表
+
+如果你频繁调用同一个方法：
+  可以把method值保存下来，重复用
+  一定程度减少开销
+```
+
+#### 结构体标签的解析原理
+
+```go
+type User struct {
+    Name string `json:"name" xml:"name"`
+}
+
+结构体标签其实就是一个字符串！
+在_type中：
+┌────────────────────────────────────┐
+│ StructField {                       │
+│   Name: "Name"                     │
+│   Type: string                      │
+│   Tag:  `json:"name" xml:"name"`   │
+│   Offset: 0                         │
+│ }                                    │
+└────────────────────────────────────┘
+
+Tag就是一个字符串
+没有特殊的存储格式
+只是约定用 key:"value" 的形式
+
+t.Field(0).Tag.Get("json") 的实现：
+  1. 取出Tag字符串
+  2. 用空格分割：["json:\"name\"", "xml:\"name\""]
+  3. 找key为"json"的
+  4. 把value取出来
+  5. 返回
+
+完全就是字符串解析！
+没有魔法！
+```
+
+---
+
+> **下一章**：[第13章 底层编程](./ch13-unsafe-cgo.md) —— unsafe包、cgo调用C代码等高级话题。

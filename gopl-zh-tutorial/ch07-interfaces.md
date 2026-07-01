@@ -1710,3 +1710,143 @@ fmt.Println(x)  // 不需要知道类型，Println内部自动处理
 ---
 
 > **下一章**：[第8章 Goroutines和Channels](./ch08-goroutines-channels.md) —— Go并发的核心机制。
+
+---
+
+### 🔬 7.13 底层原理：接口值的底层实现和类型转换
+
+#### iface 和 eface 的完整结构
+
+```
+Go的接口变量在底层是两个结构体：
+
+空接口（interface{} / any）：
+  用 eface（8个方法）
+  ┌────────────────────┐
+  │ eface {            │
+  │   _type *_type     │← 指向类型元数据
+  │   data  unsafe.Pointer│← 指向具体值
+  │ }                   │
+  └────────────────────┘
+  总共16字节（64位系统）
+
+非空接口（有方法的接口）：
+  用 iface（有方法列表）
+  ┌────────────────────┐
+  │ iface {            │
+  │   tab  *itab       │← 类型+方法表
+  │   data unsafe.Pointer│← 指向具体值
+  │ }                   │
+  └────────────────────┘
+  总共16字节
+```
+
+#### itab——接口和类型配对的关键
+
+```go
+var w io.Writer = os.Stdout
+
+itab是"接口类型+具体类型"的配对：
+┌──────────────────────────────────────────┐
+│ itab {                                    │
+│   inter *interfacetype  ← io.Writer       │
+│   _type *_type         ← *os.File         │
+│   hash uint32          ← 快速比较用       │
+│   _    [4]byte         ← 填充            │
+│   fun  [1]uintptr      ← 方法表（变长）   │
+│     ├ [0] = (*os.File).Write 的地址      │
+│     └ ...其他方法                         │
+│ }                                         │
+└──────────────────────────────────────────┘
+
+当 var w io.Writer = os.Stdout 时：
+  1. 检查*os.File是否实现了io.Writer（编译时验证）
+  2. 运行时创建itab（或从缓存读取）
+  3. itab缓存：相同的配对只创建一次
+  4. iface.tab = itab, iface.data = &os.Stdout
+```
+
+#### 接口转换的类型检查过程
+
+```go
+var x interface{} = 42
+
+s := x.(string)  // 类型断言
+
+运行时检查：
+        │
+        ▼
+   ┌─────────────────────────┐
+   │ 读取eface._type          │
+   │ → int                   │
+   └──────────┬──────────────┘
+              │
+              ▼
+   ┌─────────────────────────┐
+   │ x._type == string_type?  │
+   └──────────┬──────────────┘
+              │
+          ╔═══╧═══╗
+        是↓     ↓否
+          │      │
+     ┌────┴──┐ ┌─┴────────────┐
+     │ 安全  │ │ 有两种模式：   │
+     │ 转换  │ │ s:=x.(string)→panic
+     │       │ │ s,ok:=x.(string)→ok=false
+     └───────┘ └──────────────┘
+```
+
+#### 接口值的装箱和拆箱
+
+```
+装箱（Boxing）——将具体值赋给接口：
+
+var x interface{} = 42
+
+这行代码做了：
+  1. 在堆上分配8字节内存
+  2. 把42复制到堆上
+  3. eface._type = int类型信息
+  4. eface.data = 指向堆上的42
+
+拆箱（Unboxing）——从接口取出具体值：
+
+n := x.(int)
+
+这行代码做了：
+  1. 检查x._type == int？（类型检查）
+  2. 从x.data指向的堆内存读取值
+  3. 复制到n
+
+装箱的代价：堆分配 → GC要管 → 慢
+避免装箱：用泛型而不是interface{}
+```
+
+#### 接口值比较的底层细节
+
+```
+var a interface{} = [2]int{1, 2}
+var b interface{} = [2]int{1, 2}
+
+a == b 的检查：
+  1. a._type == b._type？ ← 先比类型
+      → [2]int == [2]int ✅
+  2. 类型可比吗？
+      → [2]int 可比（数组元素可比）
+  3. 比较值
+      → [1,2] == [1,2] → true
+
+var c interface{} = []int{1, 2}
+var d interface{} = []int{1, 2}
+
+c == d 的检查：
+  1. c._type == d._type？
+      → []int == []int ✅
+  2. 类型可比吗？
+      → []int 不可比！
+      → panic: runtime error: comparing uncomparable type []int
+```
+
+---
+
+> **下一章**：[第8章 Goroutines和Channels](./ch08-goroutines-channels.md) —— Go并发的核心机制。

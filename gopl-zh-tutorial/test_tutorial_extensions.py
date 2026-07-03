@@ -79,11 +79,28 @@ wave4_keywords = {
     "ch13-unsafe-cgo.md": ["FFmpeg", "Go 的堆指针"],
 }
 
+# Wave 5 必须包含的硬件微架构级对冲与大厂面试关键字检测字典
+wave5_keywords = {
+    "ch01-introduction.md": ["NUMA", "远程内存"],
+    "ch02-program-structure.md": ["存取周期", "字段物理排序"],
+    "ch03-basic-types.md": ["MESI", "伪共享"],
+    "ch04-composite-types.md": ["TLB", "分页"],
+    "ch05-functions.md": ["分支预测", "无分支"],
+    "ch06-methods.md": ["动态分发", "I-Cache"],
+    "ch07-interfaces.md": ["页表", "缺页中断"],
+    "ch08-goroutines-channels.md": ["缓存线无效", "RingBuffer"],
+    "ch09-shared-vars-concurrency.md": ["指令重排", "内存屏障"],
+    "ch10-packages-tools.md": ["死代码", "符号图"],
+    "ch11-testing.md": ["频率抖动", "调频"],
+    "ch12-reflection.md": ["直达寻址", "越过反射"],
+    "ch13-unsafe-cgo.md": ["AVX-512", "向量指令"],
+}
+
 def test_extensions():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     failed = False
     
-    print("=== 开始执行教程文档无损扩展 Wave 4 TDD 测试 ===")
+    print("=== 开始执行教程文档无损扩展 Wave 5 TDD 测试 ===")
     
     # 1. 验证 13 个章节文件
     for chap in chapters:
@@ -123,6 +140,12 @@ def test_extensions():
             print(f"[FAIL] 文件 {chap} 缺失 Wave 4 关键字: {missing_kw4}")
             failed = True
             
+        # 验证 Wave 5 关键字
+        missing_kw5 = [kw for kw in wave5_keywords[chap] if kw not in content]
+        if missing_kw5:
+            print(f"[FAIL] 文件 {chap} 缺失 Wave 5 关键字: {missing_kw5}")
+            failed = True
+            
         # 验证是否包含 ASCII 流程图特征框线字符
         box_chars = ["┌", "┐", "└", "┘", "│", "─", "▼", "▲", "├", "┤", "┴", "┬"]
         has_ascii_diagram = any(char in content for char in box_chars)
@@ -130,8 +153,8 @@ def test_extensions():
             print(f"[FAIL] 文件 {chap} 缺失 ASCII 架构图/流程图解")
             failed = True
             
-        if not missing_kw2 and not missing_kw3 and not missing_kw4 and has_ascii_diagram:
-            print(f"[PASS] 文件 {chap} 已成功通过 Wave 4 校验。")
+        if not missing_kw2 and not missing_kw3 and not missing_kw4 and not missing_kw5 and has_ascii_diagram:
+            print(f"[PASS] 文件 {chap} 已成功通过 Wave 5 校验。")
             
     # 2. 验证附录文件
     app_path = os.path.join(base_dir, appendix)
@@ -146,18 +169,19 @@ def test_extensions():
         has_wave2_appendix = "SwissTable" in app_content and "Green Tea" in app_content
         has_wave3_appendix = "SIMD" in app_content
         has_wave4_appendix = "SIMD" in app_content and "SwissTable" in app_content
+        has_wave5_appendix = "预取" in app_content and "Prefetching" in app_content
         
-        if not has_new_versions or not has_wave2_appendix or not has_wave3_appendix or not has_wave4_appendix:
-            print(f"[FAIL] 附录 {appendix} 缺失版本演进或 Wave 4 真实场景精讲")
+        if not has_new_versions or not has_wave2_appendix or not has_wave3_appendix or not has_wave4_appendix or not has_wave5_appendix:
+            print(f"[FAIL] 附录 {appendix} 缺失版本演进或 Wave 5 硬件级精讲")
             failed = True
         else:
-            print(f"[PASS] 附录 {appendix} 已成功更新至 Wave 4。")
+            print(f"[PASS] 附录 {appendix} 已成功更新至 Wave 5。")
             
     if failed:
-        print("\n=== 测试未通过：存在缺失的 Wave 4 真实场景与面试扩展章节/关键字 ===")
+        print("\n=== 测试未通过：存在缺失的 Wave 5 硬件微架构扩展章节/关键字 ===")
         sys.exit(1)
     else:
-        print("\n=== 测试全部通过！13个章节及附录均符合 Wave 4 扩展规范 ===")
+        print("\n=== 测试全部通过！13个章节及附录均符合 Wave 5 扩展规范 ===")
         sys.exit(0)
 
 if __name__ == "__main__":

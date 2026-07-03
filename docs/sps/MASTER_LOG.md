@@ -10,3 +10,5 @@
 | 2026-07-03 | TUTORIAL_EXT_W3 | Wave 3 GOPL 教程扩展 | docs/sps/plans/20260703_plan_wave3_extension.md | 已完成（验收报告：docs/sps/logs/20260703_wave3_verification_report.md） |
 | 2026-07-03 | SCAN_ALIGNMENT_W4 | Wave 4 架构与需求深挖 | docs/sps/decisions/20260703_adr004_wave4_scan.md | 已通过 |
 | 2026-07-03 | TUTORIAL_EXT_W4 | Wave 4 GOPL 教程扩展 | docs/sps/plans/20260703_plan_wave4_extension.md | 已完成（验收报告：docs/sps/logs/20260703_wave4_verification_report.md） |
+| 2026-07-03 | SCAN_ALIGNMENT_W5 | Wave 5 架构与需求深挖 | docs/sps/decisions/20260703_adr005_wave5_scan.md | 已通过 |
+| 2026-07-03 | TUTORIAL_EXT_W5 | Wave 5 GOPL 教程扩展 | docs/sps/plans/20260703_plan_wave5_extension.md | 已完成（验收报告：docs/sps/logs/20260703_wave5_verification_report.md） |

@@ -16,3 +16,5 @@
 | 2026-07-03 | TUTORIAL_EXT_W6 | Wave 6 GOPL 教程扩展 | docs/sps/plans/20260703_plan_wave6_extension.md | 已完成（验收报告：docs/sps/logs/20260703_wave6_verification_report.md） |
 | 2026-07-03 | SCAN_ALIGNMENT_W7 | Wave 7 架构与需求深挖 | docs/sps/decisions/20260703_adr007_wave7_scan.md | 已通过 |
 | 2026-07-03 | TUTORIAL_EXT_W7 | Wave 7 GOPL 教程扩展 | docs/sps/plans/20260703_plan_wave7_extension.md | 已完成（验收报告：docs/sps/logs/20260703_wave7_verification_report.md） |
+| 2026-07-03 | SCAN_ALIGNMENT_W8 | Wave 8 架构与需求深挖 | docs/sps/decisions/20260703_adr008_wave8_scan.md | 已通过 |
+| 2026-07-03 | TUTORIAL_EXT_W8 | Wave 8 GOPL 教程扩展 | docs/sps/plans/20260703_plan_wave8_extension.md | 已完成（验收报告：docs/sps/logs/20260703_wave8_verification_report.md） |

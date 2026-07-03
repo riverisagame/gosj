@@ -8,7 +8,6 @@ try:
 except AttributeError:
     pass
 
-# 待检查的教程文件列表（13个章节文件）
 chapters = [
     "ch01-introduction.md",
     "ch02-program-structure.md",
@@ -25,7 +24,6 @@ chapters = [
     "ch13-unsafe-cgo.md",
 ]
 
-# 附录文件
 appendix = "appendix-go-versions.md"
 
 # Wave 2 必须包含的硬核底层原理关键字检测字典
@@ -130,11 +128,47 @@ wave7_keywords = {
     "ch13-unsafe-cgo.md": ["AES-GCM", "网卡吞吐"],
 }
 
+def check_markdown_syntax(file_path):
+    """
+    静态语法状态机审计：
+    1. 统计 ``` 代码块标记的频次，必须成对出现（偶数）。
+    2. 剥离代码块内的文本，统计外部 HTML 注释对 <!-- 和 --> 的数量，必须绝对一致。
+    """
+    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+        
+    lines = content.split("\n")
+    code_block_count = 0
+    in_code_block = False
+    clean_lines = []
+    
+    for line in lines:
+        if line.strip().startswith("```"):
+            code_block_count += 1
+            in_code_block = not in_code_block
+            continue
+        if not in_code_block:
+            clean_lines.append(line)
+            
+    if code_block_count % 2 != 0:
+        print(f"[FAIL] {os.path.basename(file_path)} 存在未闭合的 ``` 代码围栏，当前总数: {code_block_count}")
+        return False
+        
+    # 仅统计非代码块区域的注释对数量
+    clean_content = "\n".join(clean_lines)
+    open_comments = clean_content.count("<!--")
+    close_comments = clean_content.count("-->")
+    if open_comments != close_comments:
+        print(f"[FAIL] {os.path.basename(file_path)} HTML注释对数量不匹配: <!-- ({open_comments}) vs --> ({close_comments})")
+        return False
+        
+    return True
+
 def test_extensions():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     failed = False
     
-    print("=== 开始执行教程文档无损扩展 Wave 7 TDD 测试 ===")
+    print("=== 开始执行教程文档无损扩展 Wave 8 TDD 静态语法审计测试 ===")
     
     # 1. 验证 13 个章节文件
     for chap in chapters:
@@ -156,41 +190,12 @@ def test_extensions():
             failed = True
             continue
             
-        # 验证 Wave 2 关键字
-        missing_kw2 = [kw for kw in wave2_keywords[chap] if kw not in content]
-        if missing_kw2:
-            print(f"[FAIL] 文件 {chap} 缺失 Wave 2 关键字: {missing_kw2}")
-            failed = True
-            
-        # 验证 Wave 3 关键字
-        missing_kw3 = [kw for kw in wave3_keywords[chap] if kw not in content]
-        if missing_kw3:
-            print(f"[FAIL] 文件 {chap} 缺失 Wave 3 关键字: {missing_kw3}")
-            failed = True
-            
-        # 验证 Wave 4 关键字
-        missing_kw4 = [kw for kw in wave4_keywords[chap] if kw not in content]
-        if missing_kw4:
-            print(f"[FAIL] 文件 {chap} 缺失 Wave 4 关键字: {missing_kw4}")
-            failed = True
-            
-        # 验证 Wave 5 关键字
-        missing_kw5 = [kw for kw in wave5_keywords[chap] if kw not in content]
-        if missing_kw5:
-            print(f"[FAIL] 文件 {chap} 缺失 Wave 5 关键字: {missing_kw5}")
-            failed = True
-            
-        # 验证 Wave 6 关键字
-        missing_kw6 = [kw for kw in wave6_keywords[chap] if kw not in content]
-        if missing_kw6:
-            print(f"[FAIL] 文件 {chap} 缺失 Wave 6 关键字: {missing_kw6}")
-            failed = True
-            
-        # 验证 Wave 7 关键字
-        missing_kw7 = [kw for kw in wave7_keywords[chap] if kw not in content]
-        if missing_kw7:
-            print(f"[FAIL] 文件 {chap} 缺失 Wave 7 关键字: {missing_kw7}")
-            failed = True
+        # 验证 Wave 2~7 关键字
+        for w_idx, wave_kw in enumerate([wave2_keywords, wave3_keywords, wave4_keywords, wave5_keywords, wave6_keywords, wave7_keywords], start=2):
+            missing = [kw for kw in wave_kw[chap] if kw not in content]
+            if missing:
+                print(f"[FAIL] 文件 {chap} 缺失 Wave {w_idx} 关键字: {missing}")
+                failed = True
             
         # 验证是否包含 ASCII 流程图特征框线字符
         box_chars = ["┌", "┐", "└", "┘", "│", "─", "▼", "▲", "├", "┤", "┴", "┬"]
@@ -199,8 +204,12 @@ def test_extensions():
             print(f"[FAIL] 文件 {chap} 缺失 ASCII 架构图/流程图解")
             failed = True
             
-        if not missing_kw2 and not missing_kw3 and not missing_kw4 and not missing_kw5 and not missing_kw6 and not missing_kw7 and has_ascii_diagram:
-            print(f"[PASS] 文件 {chap} 已成功通过 Wave 7 校验。")
+        # Markdown 静态语法闭合性检验
+        if not check_markdown_syntax(file_path):
+            failed = True
+            
+        if not failed:
+            print(f"[PASS] 文件 {chap} 静态格式与多波关键字校验 100% 合格。")
             
     # 2. 验证附录文件
     app_path = os.path.join(base_dir, appendix)
@@ -219,17 +228,20 @@ def test_extensions():
         has_wave6_appendix = "Rehash" in app_content and "观测" in app_content
         has_wave7_appendix = "服务发现" in app_content and "比对" in app_content
         
-        if not has_new_versions or not has_wave2_appendix or not has_wave3_appendix or not has_wave4_appendix or not has_wave5_appendix or not has_wave6_appendix or not has_wave7_appendix:
-            print(f"[FAIL] 附录 {appendix} 缺失版本演进或 Wave 7 分布式架构精讲")
+        # 静态语法闭合性检验
+        app_syntax_ok = check_markdown_syntax(app_path)
+        
+        if not has_new_versions or not has_wave2_appendix or not has_wave3_appendix or not has_wave4_appendix or not has_wave5_appendix or not has_wave6_appendix or not has_wave7_appendix or not app_syntax_ok:
+            print(f"[FAIL] 附录 {appendix} 格式异常或内容缺失")
             failed = True
         else:
-            print(f"[PASS] 附录 {appendix} 已成功更新至 Wave 7。")
+            print(f"[PASS] 附录 {appendix} 静态格式与多波段内容校验 100% 合格。")
             
     if failed:
-        print("\n=== 测试未通过：存在缺失的 Wave 7 分布式架构扩展章节/关键字 ===")
+        print("\n=== 测试未通过：存在 Markdown 语法缺陷或扩展缺失 ===")
         sys.exit(1)
     else:
-        print("\n=== 测试全部通过！13个章节及附录均符合 Wave 7 扩展规范 ===")
+        print("\n=== 测试全部通过！13个章节及附录的静态语法 100% 闭合健康 ===")
         sys.exit(0)
 
 if __name__ == "__main__":

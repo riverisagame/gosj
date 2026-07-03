@@ -2645,6 +2645,16 @@ hchan 结构体
 - **无锁环（RingBuffer）对冲**：
   在高性能的网络吞吐管道中，改用无锁设计（Lock-Free RingBuffer，如 Disruptor 模型）。通过基于 CAS 的原子偏移量移动来替代 Mutex，保证读写指针在内存中物理隔离开 64 字节以上，消除 CPU 核心间的缓存行争抢。
 
+<!-- @Ref: docs/sps/plans/20260703_plan_wave6_extension.md | @Date: 2026-07-03 -->
+#### 8.9 运行时剖析对冲：利用 eBPF 动态捕获用户态协程 gopark 耗时与调度器延迟（Scheduling Latency）的内核对冲
+- **剖析痛点**：
+  当高并发服务中出现慢请求（P99.9 时延突发飙升至 500ms）时，如果只监控 CPU 占用率会发现一切正常。
+  这是因为很多协程虽然早就准备好了，但因为 P 的短缺或调度器忙碌，在可运行队列里排队了很久迟迟没有被调度器捞起来执行，这种隐形延迟在用户态是极难被观测到的。
+- **eBPF 调度器延迟监控**：
+  大厂在 Linux 内核层，利用 eBPF 挂载到 Go 程序的 `runtime.execute`（调度协程开始执行）和 `runtime.gopark`（挂起协程）函数上。
+  通过在内核计算两个事件之间的时间差，精准测算出每个 Goroutine 的 **调度器延迟**（**Scheduling Latency**）。
+  如果调度延迟指标偏高，则说明系统发生了严重的 CPU 抢占或 runtime 线程过载，必须降低并发数或优化 GOMAXPROCS 来平摊延迟。
+
 ### 🏆 大厂CTO级面试金典
 
 #### 8.5 大厂面试金典真题
@@ -2919,6 +2929,17 @@ for n := range sq(sq(gen(2, 3))) {
   > **RingBuffer 无锁优化方案**：
   > 大厂核心队列（如高性能日志库或网关分发器）往往采用环形无锁数组，在数据结构设计上，读指针 `readIndex` 和写指针 `writeIndex` 之间通过注入 `[56]byte`（或 `_ [8]uint64`）实现 64 字节对齐填充。
   > 这从物理上割裂了读写指针的缓存行重叠（Alignment Padding），读写协程各自在独立的 CPU Core 缓存内运行，只通过硬件级 CAS 原子移位指令同步消费位置，消除了缓存线无效的震荡。
+
+##### 6. 什么是 Go 调度器延迟（Scheduler Latency）？如何使用 eBPF 无损度量它？
+- **小白通俗说辞**：
+  > 就像你在快餐店排队。虽然你已经站在了取餐口（协程处于 _Grunnable 可运行状态），但服务员（调度器）太忙了，过了 10 分钟才把餐递给你（真正开始执行 `_Grunning`）。这个排队等待的 10 分钟，就是调度器延迟。
+  > 我们的隐形摄像头（eBPF）会在你到取餐口和拿到餐时分别记下时间，相减就是你在店里浪费的排队时间，快餐店（系统运行）效率一目了然。
+- **CTO 专业黑话**：
+  > 调度器延迟（Scheduler Latency）指的是 Goroutine 从被唤醒并置为 `_Grunnable` 状态（进入全局或本地运行队列 `runq`），到真正被 M 绑定并开始执行 `runtime.execute` 的物理时间间隔。
+  > **eBPF 无损度量方案**：
+  > 我们可以编写 eBPF 程序，通过 uprobe 钩子拦截 `runtime.ready`（协程置为可运行）和 `runtime.execute`（协程开始运行）。
+  > 在 eBPF 的 BPF_MAP 中，以当前 Goroutine 的协程 ID（g 指针地址）作为 Key，记录 `ready` 触发时的纳秒级时间戳。
+  > 在 `execute` 触发时，读取当前时间戳并减去之前记录的值，即为该协程的单次调度延迟。最后将延迟直方图通过 Ring Buffer 输出至用户态。该机制无需在 Go 程序中插入任何统计代码，对生产系统的 QPS 损耗低于 1%，平摊了可观测性监控的额外负荷。
 
 > **下一章**：[第9章 基于共享变量的并发](./ch09-shared-vars-concurrency.md) —— 竞争条件、Mutex、RWMutex、内存同步、sync.Once和竞争检测。
 

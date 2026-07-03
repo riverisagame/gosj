@@ -2078,6 +2078,15 @@ type stringStruct struct {
 - **Go 运行时的对冲方案**：
   在高性能组件中，通过在变量之间填充不含指针的占位字节（**伪共享**对冲，如使用 `[8]uint64` 或 `align` 属性），强制让并发修改的变量处于不同的 Cache Line 中，从而平摊缓存失效开销。
 
+<!-- @Ref: docs/sps/plans/20260703_plan_wave6_extension.md | @Date: 2026-07-03 -->
+#### 3.6 运行时剖析对冲：基于 PMU 硬件性能计数器（PMC）对高并发下 Cache Miss 进行无损监控的物理对冲
+- **剖析痛点**：
+  在高频数字编码或字符转换循环中，CPU 性能的死敌是 L1/L2 缓存未命中（Cache Miss）。但这种硬件级别的瓶颈在 Go 的用户态代码（甚至是普通的 pprof）中是完全无法被感知和统计的。
+- **PMC 硬件级对冲监控**：
+  大厂利用 Linux 的 `perf` 工具直接读取 Intel/AMD CPU 内部的 **PMU（性能监控单元）** 的 **PMC（硬件性能计数器）**。
+  PMC 通过硬件计数器在 CPU 执行每一条汇编指令时，静默记录 L1-dcache-load-misses 等底层硬件事件。
+  这使得架构师能够清晰看到字符编码转换在硬件层面的 CPU 周期消耗，并根据 PMC 数据精准调整数组切片大小，对冲硬件级缓存抖动。
+
 ### 🏆 大厂CTO级面试金典
 
 #### 3.3 大厂面试金典真题
@@ -2148,6 +2157,16 @@ type stringStruct struct {
   > Core1 随后读取同一行内的变量 $Y$ 时，被迫发生 L1/L2 Cache Miss，降级去 L3 或主存重新加载。这种由于物理地址相邻带来的无效数据同步，称为**伪共享（False Sharing）**。
   > **对冲方案**：
   > 在 Go 结构体定义中，大厂核心组件通过字节补齐来保证多核写的隔离。例如使用 `_ [64 - unsafe.Sizeof(X)]byte` 进行占位填充，强迫变量分属不同的物理缓存行，绕过 MESI 的总线失效广播，提升并发吞吐。
+
+##### 6. 如何通过 Linux perf 工具读取 CPU PMU 寄存器来分析 Go 程序的缓存未命中率？
+- **小白通俗说辞**：
+  > 就像你是一个短跑运动员，普通秒表只能记下你的总时间。但为了知道你在哪里跑得慢，我们给跑道装上重力感应器（PMU 硬件计数器）。
+  > 当你脚踩地（CPU 执行指令）或者踩空打滑（Cache Miss）时，硬件感应器自动计数，完全不需要你身上挂任何设备。测试完我们看数据单，就能一眼看出你在第几米打滑了，从而帮你改鞋底（改数据布局）。
+- **CTO 专业黑话**：
+  > CPU 内部的 PMU（Performance Monitoring Unit）包含了数个特殊的物理寄存器，即性能计数器（Performance Counters）。
+  > 它们由硬件逻辑直接驱动，在发生 CPU Cycle、Instruction Retired 或 Cache Miss 时，硬件寄存器会自动累加，完全不占用 CPU 运算管线的时钟周期。
+  > 通过执行 `perf stat -e L1-dcache-load-misses ./go_program`，操作系统会通过硬件中断在特定采样点读取 PMC 寄存器的值。
+  > 通过分析 `L1-dcache-load-misses` 与总 Load 指令的比率，架构师可以量化字符拼接等高频循环操作中数据局部性（Spatial/Temporal Locality）的劣退程度，指导我们将离散字段重构成扁平、连续的内存排列，实现硬件级的极致对冲。
 
 > **下一章**：[第4章 复合数据类型](./ch04-composite-types.md) —— 数组、Slice、Map、结构体、JSON和模板。
 

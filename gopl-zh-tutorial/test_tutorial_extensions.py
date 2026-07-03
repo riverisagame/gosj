@@ -62,11 +62,28 @@ wave3_keywords = {
     "ch13-unsafe-cgo.md": ["混合写屏", "XMM 寄存器"],
 }
 
+# Wave 4 必须包含的真实应用场景与顶级大厂面试真题关键字
+wave4_keywords = {
+    "ch01-introduction.md": ["automaxprocs", "CPU 限流"],
+    "ch02-program-structure.md": ["支付网关", "GC 暂停"],
+    "ch03-basic-types.md": ["Redis 键", "Memory Swapping"],
+    "ch04-composite-types.md": ["百亿级", "Pointer-free"],
+    "ch05-functions.md": ["OOM", "参数求值"],
+    "ch06-methods.md": ["回调函数", "捕获了大变量"],
+    "ch07-interfaces.md": ["RPC", "动态路由"],
+    "ch08-goroutines-channels.md": ["netpoller", "百万"],
+    "ch09-shared-vars-concurrency.md": ["秒杀", "分段锁"],
+    "ch10-packages-tools.md": ["静默投毒", "中间人"],
+    "ch11-testing.md": ["CI 流水线", "3 小时"],
+    "ch12-reflection.md": ["ORM 框架", "相对字节偏移"],
+    "ch13-unsafe-cgo.md": ["FFmpeg", "Go 的堆指针"],
+}
+
 def test_extensions():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     failed = False
     
-    print("=== 开始执行教程文档无损扩展 Wave 3 TDD 测试 ===")
+    print("=== 开始执行教程文档无损扩展 Wave 4 TDD 测试 ===")
     
     # 1. 验证 13 个章节文件
     for chap in chapters:
@@ -79,16 +96,12 @@ def test_extensions():
         with open(file_path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
             
-        # 必须追加以下核心大标题
+        # 必须包含大标题
         has_principles = "### 🚀 底层原理纳米级精讲" in content
         has_questions = "### 🏆 大厂CTO级面试金典" in content
         
         if not has_principles or not has_questions:
             print(f"[FAIL] 文件 {chap} 缺失必须的追加模块:")
-            if not has_principles:
-                print("   - 缺失标题: '### 🚀 底层原理纳米级精讲'")
-            if not has_questions:
-                print("   - 缺失标题: '### 🏆 大厂CTO级面试金典'")
             failed = True
             continue
             
@@ -104,15 +117,21 @@ def test_extensions():
             print(f"[FAIL] 文件 {chap} 缺失 Wave 3 关键字: {missing_kw3}")
             failed = True
             
+        # 验证 Wave 4 关键字
+        missing_kw4 = [kw for kw in wave4_keywords[chap] if kw not in content]
+        if missing_kw4:
+            print(f"[FAIL] 文件 {chap} 缺失 Wave 4 关键字: {missing_kw4}")
+            failed = True
+            
         # 验证是否包含 ASCII 流程图特征框线字符
         box_chars = ["┌", "┐", "└", "┘", "│", "─", "▼", "▲", "├", "┤", "┴", "┬"]
         has_ascii_diagram = any(char in content for char in box_chars)
         if not has_ascii_diagram:
-            print(f"[FAIL] 文件 {chap} 缺失 Wave 3 ASCII 架构图/流程图解")
+            print(f"[FAIL] 文件 {chap} 缺失 ASCII 架构图/流程图解")
             failed = True
             
-        if not missing_kw2 and not missing_kw3 and has_ascii_diagram:
-            print(f"[PASS] 文件 {chap} 已成功通过 Wave 3 校验。")
+        if not missing_kw2 and not missing_kw3 and not missing_kw4 and has_ascii_diagram:
+            print(f"[PASS] 文件 {chap} 已成功通过 Wave 4 校验。")
             
     # 2. 验证附录文件
     app_path = os.path.join(base_dir, appendix)
@@ -126,18 +145,19 @@ def test_extensions():
         has_new_versions = "Go 1.24" in app_content and "Go 1.26" in app_content
         has_wave2_appendix = "SwissTable" in app_content and "Green Tea" in app_content
         has_wave3_appendix = "SIMD" in app_content
+        has_wave4_appendix = "SIMD" in app_content and "SwissTable" in app_content
         
-        if not has_new_versions or not has_wave2_appendix or not has_wave3_appendix:
-            print(f"[FAIL] 附录 {appendix} 缺失版本演进或 Wave 3 运行机制精讲")
+        if not has_new_versions or not has_wave2_appendix or not has_wave3_appendix or not has_wave4_appendix:
+            print(f"[FAIL] 附录 {appendix} 缺失版本演进或 Wave 4 真实场景精讲")
             failed = True
         else:
-            print(f"[PASS] 附录 {appendix} 已成功更新至 Wave 3。")
+            print(f"[PASS] 附录 {appendix} 已成功更新至 Wave 4。")
             
     if failed:
-        print("\n=== 测试未通过：存在缺失的 Wave 3 底层原理与面试扩展章节/关键字 ===")
+        print("\n=== 测试未通过：存在缺失的 Wave 4 真实场景与面试扩展章节/关键字 ===")
         sys.exit(1)
     else:
-        print("\n=== 测试全部通过！13个章节及附录均符合 Wave 3 扩展规范 ===")
+        print("\n=== 测试全部通过！13个章节及附录均符合 Wave 4 扩展规范 ===")
         sys.exit(0)
 
 if __name__ == "__main__":

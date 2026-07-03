@@ -1,0 +1,144 @@
+# -*- coding: utf-8 -*-
+import os
+import sys
+
+# 确保在 Windows 环境下 stdout 支持 utf-8
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except AttributeError:
+    pass
+
+# 待检查的教程文件列表（13个章节文件）
+chapters = [
+    "ch01-introduction.md",
+    "ch02-program-structure.md",
+    "ch03-basic-types.md",
+    "ch04-composite-types.md",
+    "ch05-functions.md",
+    "ch06-methods.md",
+    "ch07-interfaces.md",
+    "ch08-goroutines-channels.md",
+    "ch09-shared-vars-concurrency.md",
+    "ch10-packages-tools.md",
+    "ch11-testing.md",
+    "ch12-reflection.md",
+    "ch13-unsafe-cgo.md",
+]
+
+# 附录文件
+appendix = "appendix-go-versions.md"
+
+# Wave 2 必须包含的硬核底层原理关键字检测字典
+wave2_keywords = {
+    "ch01-introduction.md": ["entersyscall", "exitsyscall"],
+    "ch02-program-structure.md": ["未命名常量", "对齐边界"],
+    "ch03-basic-types.md": ["DecodeRune", "查表优化"],
+    "ch04-composite-types.md": ["hashWriting", "写冲突"],
+    "ch05-functions.md": ["逃逸分析", "状态复用"],
+    "ch06-methods.md": ["方法表达式", "虚函数表"],
+    "ch07-interfaces.md": ["assertE2I", "类型断言"],
+    "ch08-goroutines-channels.md": ["copystack", "栈分裂"],
+    "ch09-shared-vars-concurrency.md": ["sync.Pool", "poolLocal"],
+    "ch10-packages-tools.md": ["Sumdb", "默克尔树"],
+    "ch11-testing.md": ["ThreadSanitizer", "影子内存"],
+    "ch12-reflection.md": ["Value.Set", "flag 安全校验"],
+    "ch13-unsafe-cgo.md": ["汇编函数", "堆逃逸"],
+}
+
+# Wave 3 必须包含的纳米级图解与最硬核大厂面试关键字
+wave3_keywords = {
+    "ch01-introduction.md": ["rt0_go", "ELF/PE"],
+    "ch02-program-structure.md": ["有向无环图", "SP 寄存器"],
+    "ch03-basic-types.md": ["IEEE 754", "指数与尾数"],
+    "ch04-composite-types.md": ["roundupsize", "溢出桶"],
+    "ch05-functions.md": ["bitmask", "recover()"],
+    "ch06-methods.md": ["method value", "值接收者"],
+    "ch07-interfaces.md": ["itabTable", "无锁哈希"],
+    "ch08-goroutines-channels.md": ["G0 调度栈", "sudog 双向"],
+    "ch09-shared-vars-concurrency.md": ["CanSpin", "victim"],
+    "ch10-packages-tools.md": ["MVS 算法", "依赖树"],
+    "ch11-testing.md": ["隔离泡泡", "TSan"],
+    "ch12-reflection.md": ["flagRO", "私有成员"],
+    "ch13-unsafe-cgo.md": ["混合写屏", "XMM 寄存器"],
+}
+
+def test_extensions():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    failed = False
+    
+    print("=== 开始执行教程文档无损扩展 Wave 3 TDD 测试 ===")
+    
+    # 1. 验证 13 个章节文件
+    for chap in chapters:
+        file_path = os.path.join(base_dir, chap)
+        if not os.path.exists(file_path):
+            print(f"[FAIL] 找不到教程文件: {chap}")
+            failed = True
+            continue
+            
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+            
+        # 必须追加以下核心大标题
+        has_principles = "### 🚀 底层原理纳米级精讲" in content
+        has_questions = "### 🏆 大厂CTO级面试金典" in content
+        
+        if not has_principles or not has_questions:
+            print(f"[FAIL] 文件 {chap} 缺失必须的追加模块:")
+            if not has_principles:
+                print("   - 缺失标题: '### 🚀 底层原理纳米级精讲'")
+            if not has_questions:
+                print("   - 缺失标题: '### 🏆 大厂CTO级面试金典'")
+            failed = True
+            continue
+            
+        # 验证 Wave 2 关键字
+        missing_kw2 = [kw for kw in wave2_keywords[chap] if kw not in content]
+        if missing_kw2:
+            print(f"[FAIL] 文件 {chap} 缺失 Wave 2 关键字: {missing_kw2}")
+            failed = True
+            
+        # 验证 Wave 3 关键字
+        missing_kw3 = [kw for kw in wave3_keywords[chap] if kw not in content]
+        if missing_kw3:
+            print(f"[FAIL] 文件 {chap} 缺失 Wave 3 关键字: {missing_kw3}")
+            failed = True
+            
+        # 验证是否包含 ASCII 流程图特征框线字符
+        box_chars = ["┌", "┐", "└", "┘", "│", "─", "▼", "▲", "├", "┤", "┴", "┬"]
+        has_ascii_diagram = any(char in content for char in box_chars)
+        if not has_ascii_diagram:
+            print(f"[FAIL] 文件 {chap} 缺失 Wave 3 ASCII 架构图/流程图解")
+            failed = True
+            
+        if not missing_kw2 and not missing_kw3 and has_ascii_diagram:
+            print(f"[PASS] 文件 {chap} 已成功通过 Wave 3 校验。")
+            
+    # 2. 验证附录文件
+    app_path = os.path.join(base_dir, appendix)
+    if not os.path.exists(app_path):
+        print(f"[FAIL] 找不到附录文件: {appendix}")
+        failed = True
+    else:
+        with open(app_path, "r", encoding="utf-8", errors="replace") as f:
+            app_content = f.read()
+            
+        has_new_versions = "Go 1.24" in app_content and "Go 1.26" in app_content
+        has_wave2_appendix = "SwissTable" in app_content and "Green Tea" in app_content
+        has_wave3_appendix = "SIMD" in app_content
+        
+        if not has_new_versions or not has_wave2_appendix or not has_wave3_appendix:
+            print(f"[FAIL] 附录 {appendix} 缺失版本演进或 Wave 3 运行机制精讲")
+            failed = True
+        else:
+            print(f"[PASS] 附录 {appendix} 已成功更新至 Wave 3。")
+            
+    if failed:
+        print("\n=== 测试未通过：存在缺失的 Wave 3 底层原理与面试扩展章节/关键字 ===")
+        sys.exit(1)
+    else:
+        print("\n=== 测试全部通过！13个章节及附录均符合 Wave 3 扩展规范 ===")
+        sys.exit(0)
+
+if __name__ == "__main__":
+    test_extensions()
